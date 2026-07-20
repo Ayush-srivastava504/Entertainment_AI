@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: entertainment-ai-neural-generator
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: MODEL_REPO
+        value: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+      - key: MODEL_FILE
+        value: qwen2.5-1.5b-instruct-q4_k_m.gguf
+      - key: LLM_N_THREADS
+        value: "2"
+      - key: LLM_N_CTX
+        value: "4096"

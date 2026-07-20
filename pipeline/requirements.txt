@@ -1,0 +1,4 @@
+llama-cpp-python==0.2.85
+huggingface_hub==0.24.0
+psycopg2-binary==2.9.9
+awscli==1.34.15
