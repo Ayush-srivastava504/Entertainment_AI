@@ -14,7 +14,7 @@ Flow:
 Env vars:
   DATABASE_URL             required (same one process_queue.py uses)
 Optional (defaults produce 1 new item of each type per day -- a t2.micro
-running a 1.5B model can comfortably do this in one run):
+can comfortably do this in one run with the default 0.5B model):
   BLOG_POSTS_PER_RUN        default 1
   MOVIE_RANKINGS_PER_RUN    default 1
   ANIME_RANKINGS_PER_RUN    default 1
@@ -23,6 +23,7 @@ running a 1.5B model can comfortably do this in one run):
 import json
 import logging
 import os
+import random
 import sys
 
 import psycopg2
@@ -35,10 +36,12 @@ from content_prompts import (
     QUIZ_TOPICS,
     blog_prompt,
     ranking_prompt,
+    grounded_ranking_prompt,
     quiz_prompt,
     extract_json_object,
     slugify,
 )
+from data.anime_catalog import ANIME_CATALOG, GENRES
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
@@ -49,6 +52,48 @@ BLOG_N = int(os.environ.get("BLOG_POSTS_PER_RUN", "1"))
 MOVIE_N = int(os.environ.get("MOVIE_RANKINGS_PER_RUN", "1"))
 ANIME_N = int(os.environ.get("ANIME_RANKINGS_PER_RUN", "1"))
 QUIZ_N = int(os.environ.get("QUIZZES_PER_RUN", "1"))
+
+
+# ---------------------------------------------------------------------
+# Catalog matching: map a topic string ("Best Romance Anime", "Best Anime
+# Movies (Not Series)") onto genre tags in anime_catalog.py, then sample
+# real titles from the matching entries. No match (e.g. "Best Anime
+# Villains, Ranked" -- not a genre) falls back to sampling the whole
+# catalog rather than returning nothing.
+# ---------------------------------------------------------------------
+def catalog_candidates(topic: str, n: int = 7):
+    topic_lower = topic.lower()
+    matched_genres = [
+        g for g in GENRES if g in topic_lower or g.replace("-", " ") in topic_lower
+    ]
+    if "movie" in topic_lower or "movies" in topic_lower:
+        matched_genres.append("movie")
+
+    if matched_genres:
+        pool = [
+            (title, year)
+            for title, year, genres in ANIME_CATALOG
+            if any(g in genres for g in matched_genres)
+        ]
+    else:
+        pool = [(title, year) for title, year, _ in ANIME_CATALOG]
+
+    if not pool:  # matched genre exists in GENRES but nothing tagged with it yet
+        pool = [(title, year) for title, year, _ in ANIME_CATALOG]
+
+    return random.sample(pool, min(n, len(pool)))
+
+
+def grounding_titles_for_topic(topic: str, n: int = 3):
+    """Light-touch grounding for blog/quiz prompts -- only kicks in when
+    the topic actually looks anime-related, otherwise returns nothing so
+    movie-only topics (e.g. an MCU blog post) don't get random anime
+    titles injected."""
+    topic_lower = topic.lower()
+    if "anime" not in topic_lower and "ghibli" not in topic_lower and "manga" not in topic_lower:
+        return None
+    candidates = catalog_candidates(topic, n)
+    return [title for title, _year in candidates] or None
 
 
 # ---------------------------------------------------------------------
@@ -88,7 +133,10 @@ def existing_slugs(conn, table: str) -> set:
 # `on conflict do nothing` makes inserts idempotent if a slug races.
 # ---------------------------------------------------------------------
 def generate_blog_post(llm, conn, label: str, slug: str):
-    raw = generate(llm, blog_prompt(label), max_tokens=900, temperature=0.85)
+    reference_titles = grounding_titles_for_topic(label)
+    raw = generate(
+        llm, blog_prompt(label, reference_titles), max_tokens=900, temperature=0.85
+    )
     data = json.loads(extract_json_object(raw))
     title = data.get("title") or label
     meta = (data.get("meta_description") or "")[:160]
@@ -109,6 +157,9 @@ def generate_blog_post(llm, conn, label: str, slug: str):
 
 
 def generate_ranking(llm, conn, category: str, label: str, slug: str):
+    """Movie rankings only -- the model still picks titles itself here.
+    Anime rankings use generate_anime_ranking below instead, grounded in
+    anime_catalog.py so titles are guaranteed real."""
     raw = generate(
         llm, ranking_prompt(category, label), max_tokens=800, temperature=0.8
     )
@@ -132,8 +183,65 @@ def generate_ranking(llm, conn, category: str, label: str, slug: str):
     conn.commit()
 
 
+def generate_anime_ranking(llm, conn, label: str, slug: str):
+    """Anime rankings: pick real candidate titles from anime_catalog.py
+    matching the topic, then have the model choose 5, order them, and
+    write the surrounding text -- it's constrained to the candidate list,
+    so it can't invent a title that doesn't exist. Anything the model
+    returns that ISN'T in the candidate set is dropped rather than
+    trusted (defense in depth beyond the prompt instruction)."""
+    candidates = catalog_candidates(label, n=8)
+    valid_titles = {title for title, _year in candidates}
+    valid_years = {title: year for title, year in candidates}
+
+    raw = generate(
+        llm, grounded_ranking_prompt(label, candidates), max_tokens=700, temperature=0.75
+    )
+    data = json.loads(extract_json_object(raw))
+    title = data.get("title") or label
+    meta = (data.get("meta_description") or "")[:160]
+    intro = data.get("intro") or ""
+    items = data.get("items")
+    if not isinstance(items, list):
+        raise ValueError("ranking response missing a valid 'items' array")
+
+    clean_items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_title = item.get("title")
+        if item_title not in valid_titles:
+            continue  # model drifted from the candidate list -- drop it
+        clean_items.append(
+            {
+                "title": item_title,
+                "year": valid_years[item_title],
+                "blurb": (item.get("blurb") or "")[:400],
+            }
+        )
+
+    if len(clean_items) < 3:
+        raise ValueError(
+            f"only {len(clean_items)} valid candidate titles survived filtering"
+        )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into rankings (category, slug, title, meta_description, intro, items)
+            values ('anime', %s, %s, %s, %s, %s::jsonb)
+            on conflict (slug) do nothing
+            """,
+            (slug, title, meta, intro, json.dumps(clean_items)),
+        )
+    conn.commit()
+
+
 def generate_quiz(llm, conn, label: str, slug: str):
-    raw = generate(llm, quiz_prompt(label), max_tokens=1400, temperature=0.8)
+    reference_titles = grounding_titles_for_topic(label)
+    raw = generate(
+        llm, quiz_prompt(label, reference_titles), max_tokens=1400, temperature=0.8
+    )
     data = json.loads(extract_json_object(raw))
     description = data.get("description") or ""
     results = data.get("results")

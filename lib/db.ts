@@ -70,13 +70,29 @@ export interface BlogPostRow {
   title: string;
   meta_description: string;
   body: string[];
+  likes: number;
   published_at: string;
 }
 
-export async function getBlogPosts(limit = 100): Promise<BlogPostRow[]> {
+// "trending" blends recency and likes (Hacker-News-style hot score: likes
+// decayed by age) so a popular old post doesn't bury today's post forever,
+// but a post that's genuinely getting liked still climbs. "recent" is a
+// plain published_at sort if you ever want it.
+const BLOG_TRENDING_ORDER = `
+  order by likes / power(
+    extract(epoch from (now() - published_at)) / 3600 + 2, 1.5
+  ) desc, published_at desc
+`;
+
+export async function getBlogPosts(
+  limit = 100,
+  sort: "trending" | "recent" = "trending"
+): Promise<BlogPostRow[]> {
+  const orderClause =
+    sort === "trending" ? BLOG_TRENDING_ORDER : "order by published_at desc";
   const { rows } = await getPool().query<BlogPostRow>(
-    `select slug, title, meta_description, body, published_at
-     from blog_posts order by published_at desc limit $1`,
+    `select slug, title, meta_description, body, likes, published_at
+     from blog_posts ${orderClause} limit $1`,
     [limit]
   );
   return rows;
@@ -86,7 +102,7 @@ export async function getBlogPostBySlug(
   slug: string
 ): Promise<BlogPostRow | null> {
   const { rows } = await getPool().query<BlogPostRow>(
-    `select slug, title, meta_description, body, published_at
+    `select slug, title, meta_description, body, likes, published_at
      from blog_posts where slug = $1`,
     [slug]
   );
@@ -154,13 +170,25 @@ export interface QuizRow {
   description: string;
   questions: QuizQuestion[];
   results: QuizResult[];
+  likes: number;
   published_at: string;
 }
 
-export async function getQuizzes(limit = 100): Promise<QuizRow[]> {
+const QUIZ_TRENDING_ORDER = `
+  order by likes / power(
+    extract(epoch from (now() - published_at)) / 3600 + 2, 1.5
+  ) desc, published_at desc
+`;
+
+export async function getQuizzes(
+  limit = 100,
+  sort: "trending" | "recent" = "trending"
+): Promise<QuizRow[]> {
+  const orderClause =
+    sort === "trending" ? QUIZ_TRENDING_ORDER : "order by published_at desc";
   const { rows } = await getPool().query<QuizRow>(
-    `select slug, title, description, questions, results, published_at
-     from quizzes order by published_at desc limit $1`,
+    `select slug, title, description, questions, results, likes, published_at
+     from quizzes ${orderClause} limit $1`,
     [limit]
   );
   return rows;
@@ -168,9 +196,68 @@ export async function getQuizzes(limit = 100): Promise<QuizRow[]> {
 
 export async function getQuizBySlug(slug: string): Promise<QuizRow | null> {
   const { rows } = await getPool().query<QuizRow>(
-    `select slug, title, description, questions, results, published_at
+    `select slug, title, description, questions, results, likes, published_at
      from quizzes where slug = $1`,
     [slug]
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Likes — one click increments a counter server-side. Anyone can call
+ * this (no auth, matching the rest of the site), so treat it as a rough
+ * popularity signal, not a tamper-proof vote. The client hides the
+ * button after one click per browser (see LikeButton.tsx / localStorage)
+ * as a light deterrent, not real vote integrity.
+ */
+export async function incrementLikes(
+  type: "blog" | "quiz",
+  slug: string
+): Promise<number | null> {
+  const table = type === "blog" ? "blog_posts" : "quizzes";
+  const { rows } = await getPool().query<{ likes: number }>(
+    `update ${table} set likes = likes + 1 where slug = $1 returning likes`,
+    [slug]
+  );
+  return rows[0]?.likes ?? null;
+}
+
+/**
+ * Comments — anyone can post, no login, matching the rest of the site.
+ * content_type + content_slug point at a blog_posts.slug or quizzes.slug
+ * without a foreign key, so this table stays decoupled from either.
+ */
+export interface CommentRow {
+  id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export async function getComments(
+  contentType: "blog" | "quiz",
+  contentSlug: string
+): Promise<CommentRow[]> {
+  const { rows } = await getPool().query<CommentRow>(
+    `select id, author_name, body, created_at from comments
+     where content_type = $1 and content_slug = $2
+     order by created_at desc`,
+    [contentType, contentSlug]
+  );
+  return rows;
+}
+
+export async function addComment(
+  contentType: "blog" | "quiz",
+  contentSlug: string,
+  authorName: string,
+  body: string
+): Promise<CommentRow> {
+  const { rows } = await getPool().query<CommentRow>(
+    `insert into comments (content_type, content_slug, author_name, body)
+     values ($1, $2, $3, $4)
+     returning id, author_name, body, created_at`,
+    [contentType, contentSlug, authorName, body]
+  );
+  return rows[0];
 }

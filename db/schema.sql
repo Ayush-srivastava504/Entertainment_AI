@@ -38,6 +38,7 @@ create table if not exists blog_posts (
   title             text not null,
   meta_description  text not null,
   body              jsonb not null,        -- array of paragraph strings
+  likes             integer not null default 0,
   published_at      timestamptz not null default now()
 );
 
@@ -63,7 +64,32 @@ create table if not exists quizzes (
   description       text not null,
   questions         jsonb not null,  -- [{ text, options: [{ text, result }] }]
   results           jsonb not null,  -- [{ key, title, description }]
+  likes             integer not null default 0,
   published_at      timestamptz not null default now()
 );
 
 create index if not exists idx_quizzes_published on quizzes (published_at desc);
+
+-- ---------------------------------------------------------------------
+-- Comments — anyone can post, no login. content_type + content_slug
+-- together point at a blog_posts.slug or quizzes.slug row (no foreign
+-- key on purpose: keeps this table decoupled from which content table
+-- is on the other end, and comments survive even if you regenerate slugs).
+-- ---------------------------------------------------------------------
+
+create table if not exists comments (
+  id            uuid primary key default gen_random_uuid(),
+  content_type  text not null,          -- 'blog' | 'quiz'
+  content_slug  text not null,
+  author_name   text not null,
+  body          text not null,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists idx_comments_lookup on comments (content_type, content_slug, created_at desc);
+
+-- Migrating an existing database that already has these tables without
+-- the new columns? Run this once:
+--   alter table blog_posts add column if not exists likes integer not null default 0;
+--   alter table quizzes add column if not exists likes integer not null default 0;
+

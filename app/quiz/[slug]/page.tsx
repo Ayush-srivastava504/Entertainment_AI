@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getQuizBySlug } from "@/lib/db";
 import QuizPlayer from "@/components/QuizPlayer";
+import LikeButton from "@/components/LikeButton";
+import CommentSection from "@/components/CommentSection";
 
 export const revalidate = 3600;
 
@@ -32,8 +34,12 @@ export default async function QuizPage({
       <h1 className="font-display text-5xl text-marquee-text mb-3">
         {quiz.title}
       </h1>
-      <p className="text-marquee-textDim mb-8">{quiz.description}</p>
+      <p className="text-marquee-textDim mb-4">{quiz.description}</p>
+      <div className="mb-8">
+        <LikeButton type="quiz" slug={quiz.slug} initialLikes={quiz.likes} />
+      </div>
       <QuizPlayer questions={quiz.questions} results={quiz.results} />
+      <CommentSection type="quiz" slug={quiz.slug} />
     </div>
   );
 }

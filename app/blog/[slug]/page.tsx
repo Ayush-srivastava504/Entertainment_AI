@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/db";
+import LikeButton from "@/components/LikeButton";
+import CommentSection from "@/components/CommentSection";
 
 export const revalidate = 3600;
 // Slugs are DB-driven (written by the daily pipeline run), not known at
@@ -35,14 +37,18 @@ export default async function BlogPostPage({
           day: "numeric",
         })}
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-8">
+      <h1 className="font-display text-5xl text-marquee-text mb-4">
         {post.title}
       </h1>
+      <div className="mb-8">
+        <LikeButton type="blog" slug={post.slug} initialLikes={post.likes} />
+      </div>
       <div className="space-y-4 text-marquee-text leading-relaxed">
         {post.body.map((para, i) => (
           <p key={i}>{para}</p>
         ))}
       </div>
+      <CommentSection type="blog" slug={post.slug} />
     </article>
   );
 }

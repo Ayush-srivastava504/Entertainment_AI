@@ -27,15 +27,33 @@ re-downloads nothing and boots fast.
 
 ## 0. Know the constraint you're accepting
 
-A t2.micro has **1 vCPU (burstable) and 1GB RAM**. A 1.5B q4 GGUF model
-(~1GB on disk) plus a small context window fits, but it's tight — expect
-slow generation (CPU-only, single thread) and add a swap file (step 2) so
-the OOM killer doesn't take out the process mid-run. If you queue up a lot
-of jobs in a day, the run will just take longer, not fail — there's no
-request timeout here like there was on Vercel.
+A t2.micro has **1 vCPU (burstable) and 1GB RAM**. The default model is
+now `Qwen2.5-0.5B-Instruct-GGUF` (switched from 1.5B for speed) so it
+generates noticeably faster on a single CPU thread, but it's still a
+small model — expect occasional rougher output than the 1.5B, and add a
+swap file (step 2) so the OOM killer doesn't take out the process mid-run.
+If you queue up a lot of jobs in a day, the run will just take longer, not
+fail — there's no request timeout here like there was on Vercel.
 
-If it turns out too tight in practice, dropping to `Qwen2.5-0.5B-Instruct-GGUF`
-(set `MODEL_FILE`/`MODEL_REPO` env vars) is the easy lever.
+If quality matters more than speed for your use case, set
+`MODEL_REPO=Qwen/Qwen2.5-1.5B-Instruct-GGUF` and
+`MODEL_FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf` in `pipeline/.env` to go
+back to the larger model.
+
+**The model itself is usually not the biggest source of "this took
+forever."** This whole pipeline only runs once a day (see the diagram
+above) — a person who submits a tool request right after the daily run
+just happened can wait up to ~24h for a result, no matter how fast the
+model is. If that's the delay you're actually seeing, the fix is running
+the batch more often, not a faster model:
+- In EventBridge Scheduler (step 6), change the cron expression from
+  once daily (e.g. `0 3 * * ? *`) to hourly (`0 * * * ? *`) or every 15
+  minutes (`0/15 * * * ? *`).
+- This barely changes cost: a t2.micro is billed per second it's
+  *running*, and each run (load model, drain queue, generate content,
+  stop itself) typically finishes in a couple of minutes. Running that
+  every 15 minutes instead of once a day is still a small fraction of a
+  full day's compute.
 
 ## 1. Provision Postgres (shared between EC2 and Vercel)
 
@@ -53,7 +71,7 @@ tier are the easiest — no VPC networking to fight with, unlike RDS.
 ## 2. Launch the EC2 instance
 
 1. **Launch instance** → Ubuntu 22.04 LTS → `t2.micro`.
-2. Add a swap file (1.5B model + 1GB RAM leaves no headroom):
+2. Add a swap file (small headroom on a 1GB box, cheap insurance either way):
    ```bash
    sudo fallocate -l 2G /swapfile
    sudo chmod 600 /swapfile
@@ -78,8 +96,8 @@ tier are the easiest — no VPC networking to fight with, unlike RDS.
 5. Create `pipeline/.env` (systemd loads this via `EnvironmentFile`):
    ```
    DATABASE_URL=postgres://...        # same value as Vercel's DATABASE_URL
-   MODEL_REPO=Qwen/Qwen2.5-1.5B-Instruct-GGUF
-   MODEL_FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
+   MODEL_REPO=Qwen/Qwen2.5-0.5B-Instruct-GGUF
+   MODEL_FILE=qwen2.5-0.5b-instruct-q4_k_m.gguf
    LLM_N_THREADS=1
    LLM_N_CTX=2048
 

@@ -5,7 +5,7 @@ from the lists below, in order, skipping anything whose slug already
 exists in the DB.
 
 Keep each generator asking for STRICT JSON and nothing else. The model is
-a small 1.5B instruct model running on a t2.micro, so responses are
+a small instruct model (0.5B by default) running on a t2.micro, so responses are
 parsed defensively in generate_content.py (repair-attempt + skip-on-
 failure, never crash the whole run over one bad item).
 """
@@ -120,17 +120,22 @@ def _system_json_instruction(schema_hint: str) -> str:
     )
 
 
-def blog_prompt(topic: str) -> str:
+def blog_prompt(topic: str, reference_titles: list | None = None) -> str:
     schema = (
         'Schema: {"title": string, "meta_description": string (<160 chars), '
         '"body": array of 4 strings, each a substantial paragraph (3-5 sentences) '
         "of a blog post about the topic. Write like a knowledgeable, opinionated "
         "entertainment blogger — concrete claims, no filler, no 'in conclusion'.}"
     )
-    return (
-        _system_json_instruction(schema)
-        + f'\n\nTopic: "{topic}"'
-    )
+    prompt = _system_json_instruction(schema) + f'\n\nTopic: "{topic}"'
+    if reference_titles:
+        titles = ", ".join(reference_titles)
+        prompt += (
+            "\n\nIf you name specific anime, prefer these real titles where "
+            "relevant (don't force all of them in, and only mention others "
+            f"you're confident are real): {titles}"
+        )
+    return prompt
 
 
 def ranking_prompt(category: str, topic: str) -> str:
@@ -149,7 +154,34 @@ def ranking_prompt(category: str, topic: str) -> str:
     )
 
 
-def quiz_prompt(topic: str) -> str:
+def grounded_ranking_prompt(topic: str, candidates: list) -> str:
+    """Anime rankings only: instead of asking the model to invent titles
+    (which a small model does unreliably), give it a shortlist of REAL
+    titles from anime_catalog.py and have it pick + order 5 of them and
+    write the surrounding text. It cannot introduce a title that isn't in
+    the list -- generate_content.py enforces that after parsing too."""
+    candidate_lines = "\n".join(
+        f'- "{title}" ({year})' for title, year in candidates
+    )
+    schema = (
+        'Schema: {"title": string, "meta_description": string (<160 chars), '
+        '"intro": string (2-3 sentences introducing the list), '
+        '"items": array of exactly 5 objects, each '
+        '{"title": string (MUST be copied exactly from the candidate list '
+        'below, do not alter it), "year": number (use the year given for '
+        "that title), \"blurb\": string (1-2 sentences on why it earns its "
+        'spot)}. Order items from best (rank 1) to fifth-best. Pick exactly '
+        "5 DIFFERENT titles from the candidate list -- never invent a title "
+        "that isn't in it.}"
+    )
+    return (
+        _system_json_instruction(schema)
+        + f'\n\nRanking topic: "{topic}" (anime)'
+        + f"\n\nCandidate titles (pick 5 of these, don't invent others):\n{candidate_lines}"
+    )
+
+
+def quiz_prompt(topic: str, reference_titles: list | None = None) -> str:
     schema = (
         'Schema: {"description": string (1 sentence describing the quiz), '
         '"results": array of exactly 4 objects, each {"key": single letter '
@@ -161,10 +193,14 @@ def quiz_prompt(topic: str) -> str:
         "results' keys}}. Every result key (A-D) should be reachable — spread "
         "options across all 4 results roughly evenly across the 5 questions.}"
     )
-    return (
-        _system_json_instruction(schema)
-        + f'\n\nQuiz topic: "{topic}"'
-    )
+    prompt = _system_json_instruction(schema) + f'\n\nQuiz topic: "{topic}"'
+    if reference_titles:
+        titles = ", ".join(reference_titles)
+        prompt += (
+            "\n\nIf this quiz references specific anime or characters, prefer "
+            f"grounding it in these real, well-known titles: {titles}"
+        )
+    return prompt
 
 
 def extract_json_object(text: str) -> str:
