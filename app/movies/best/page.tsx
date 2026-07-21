@@ -1,12 +1,16 @@
 import Link from "next/link";
-import { movieRankings } from "@/lib/content/rankings";
+import { getRankings } from "@/lib/db";
 
 export const metadata = {
   title: "Best Movie Rankings — Marquee",
   description: "Curated movie rankings by genre, mood, and platform.",
 };
 
-export default function MovieRankingsIndex() {
+export const revalidate = 3600;
+
+export default async function MovieRankingsIndex() {
+  const rankings = await getRankings("movie");
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-16">
       <p className="font-mono text-xs text-marquee-gold tracking-marquee mb-2">
@@ -15,8 +19,13 @@ export default function MovieRankingsIndex() {
       <h1 className="font-display text-5xl text-marquee-text mb-8">
         Best Movie Rankings
       </h1>
+      {rankings.length === 0 && (
+        <p className="text-marquee-textDim">
+          Nothing published yet — check back after the next daily run.
+        </p>
+      )}
       <div className="grid sm:grid-cols-2 gap-5">
-        {movieRankings.map((r) => (
+        {rankings.map((r) => (
           <Link
             key={r.slug}
             href={`/movies/best/${r.slug}`}
@@ -25,7 +34,7 @@ export default function MovieRankingsIndex() {
             <h2 className="font-display text-2xl text-marquee-text mb-1">
               {r.title}
             </h2>
-            <p className="text-sm text-marquee-textDim">{r.metaDescription}</p>
+            <p className="text-sm text-marquee-textDim">{r.meta_description}</p>
           </Link>
         ))}
       </div>

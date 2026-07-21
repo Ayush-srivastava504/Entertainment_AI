@@ -1,37 +1,46 @@
-"use client";
+import Link from "next/link";
+import { getQuizzes } from "@/lib/db";
 
-import ToolShell from "@/components/ToolShell";
+export const metadata = {
+  title: "Quizzes — Marquee",
+  description: "Personality quizzes about movies and anime.",
+};
 
-export default function QuizPage() {
+export const revalidate = 3600;
+
+export default async function QuizIndex() {
+  const quizzes = await getQuizzes();
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <p className="font-mono text-xs text-marquee-gold tracking-marquee mb-2">
         🧠 QUIZZES
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-3">
-        AI Personality Quiz Builder
+      <h1 className="font-display text-5xl text-marquee-text mb-8">
+        Quizzes
       </h1>
-      <p className="text-marquee-textDim mb-8">
-        Name a quiz. Generate one question at a time, then string together
-        as many as you need.
-      </p>
-      <ToolShell
-        task="quiz-generate"
-        showTextarea={false}
-        submitLabel="Generate a question"
-        extraFields={
-          <label className="block text-sm text-marquee-textDim">
-            Quiz title
-            <input
-              name="quizTitle"
-              required
-              placeholder="e.g. Which Anime Character Are You?"
-              className="mt-1 w-full rounded border border-marquee-line bg-marquee-panel px-3 py-2 text-marquee-text placeholder:text-marquee-textDim focus-ring outline-none"
-            />
-          </label>
-        }
-        buildInput={(fd) => ({ quizTitle: String(fd.get("quizTitle") || "") })}
-      />
+      {quizzes.length === 0 && (
+        <p className="text-marquee-textDim">
+          Nothing published yet — check back after the next daily run.
+        </p>
+      )}
+      <div className="space-y-5">
+        {quizzes.map((q) => (
+          <Link
+            key={q.slug}
+            href={`/quiz/${q.slug}`}
+            className="ticket p-6 pl-8 block hover:border-marquee-gold transition-colors focus-ring"
+          >
+            <h2 className="font-display text-2xl text-marquee-text mb-1">
+              {q.title}
+            </h2>
+            <p className="text-sm text-marquee-textDim">{q.description}</p>
+            <p className="font-mono text-xs text-marquee-textDim mt-2">
+              {q.questions.length} questions
+            </p>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

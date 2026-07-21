@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { blogPosts, getBlogPost } from "@/lib/content/blog";
+import { getBlogPostBySlug } from "@/lib/db";
 
-export function generateStaticParams() {
-  return blogPosts.map((p) => ({ slug: p.slug }));
-}
+export const revalidate = 3600;
+// Slugs are DB-driven (written by the daily pipeline run), not known at
+// build time, so no generateStaticParams — Next.js renders on-demand and
+// caches per the revalidate window above.
 
 export async function generateMetadata({
   params,
@@ -11,9 +12,9 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = getBlogPost(slug);
+  const post = await getBlogPostBySlug(slug);
   if (!post) return {};
-  return { title: `${post.title} — Marquee`, description: post.metaDescription };
+  return { title: `${post.title} — Marquee`, description: post.meta_description };
 }
 
 export default async function BlogPostPage({
@@ -22,13 +23,13 @@ export default async function BlogPostPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = getBlogPost(slug);
+  const post = await getBlogPostBySlug(slug);
   if (!post) notFound();
 
   return (
     <article className="mx-auto max-w-2xl px-6 py-16">
       <p className="font-mono text-xs text-marquee-textDim mb-2">
-        {new Date(post.date).toLocaleDateString("en-US", {
+        {new Date(post.published_at).toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",

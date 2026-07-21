@@ -10,6 +10,11 @@ How this replaces "always-on model server":
 [process_queue.py] loads Qwen once, drains every 'pending' row in queue_jobs,
         writes result/failed back to Postgres
         |
+[generate_content.py] same loaded model, picks fresh topics from its own
+        internal list (content_prompts.py) -- no user request involved --
+        and writes a new blog post, movie ranking, anime ranking, and quiz
+        straight into Postgres, already published
+        |
 [run.sh] calls `aws ec2 stop-instances` on itself -- instance goes back to $0 compute
         |
 [Vercel frontend] never talks to EC2 directly — it only reads/writes Postgres.
@@ -77,6 +82,13 @@ tier are the easiest — no VPC networking to fight with, unlike RDS.
    MODEL_FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
    LLM_N_THREADS=1
    LLM_N_CTX=2048
+
+   # optional -- how many NEW items generate_content.py writes per run
+   # (defaults shown; raise these if you want more than one of each per day)
+   BLOG_POSTS_PER_RUN=1
+   MOVIE_RANKINGS_PER_RUN=1
+   ANIME_RANKINGS_PER_RUN=1
+   QUIZZES_PER_RUN=1
    ```
 6. `chmod +x run.sh`
 
@@ -86,11 +98,14 @@ tier are the easiest — no VPC networking to fight with, unlike RDS.
 source venv/bin/activate
 ./run.sh
 ```
-Watch it: it should load the model, print `0 done` if the queue's empty
-(that's fine — queue a test job from the live site first if you want to see
-a real one process), then call `aws ec2 stop-instances` — which will fail
-here with a permissions error until step 4 is done. That's expected; fix
-the IAM role, then it'll actually stop itself on the *scheduled* runs.
+Watch it: it should load the model, drain the queue (prints `0 done` if
+it's empty — that's fine, queue a test job from the live site first if you
+want to see a real one process), then run `generate_content.py`, which
+writes one new blog post, one movie ranking, one anime ranking, and one
+quiz straight into Postgres (already published — no review step). Finally
+it calls `aws ec2 stop-instances` — which will fail here with a permissions
+error until step 4 is done. That's expected; fix the IAM role, then it'll
+actually stop itself on the *scheduled* runs.
 
 ## 4. IAM role so the instance can stop itself
 

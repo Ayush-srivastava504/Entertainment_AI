@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
-import { animeRankings, getAnimeRanking } from "@/lib/content/rankings";
+import { getRankingBySlug } from "@/lib/db";
 import FavoriteButton from "@/components/FavoriteButton";
 
-export function generateStaticParams() {
-  return animeRankings.map((r) => ({ slug: r.slug }));
-}
+export const revalidate = 3600;
 
 export async function generateMetadata({
   params,
@@ -12,9 +10,9 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const ranking = getAnimeRanking(slug);
+  const ranking = await getRankingBySlug("anime", slug);
   if (!ranking) return {};
-  return { title: `${ranking.title} — Marquee`, description: ranking.metaDescription };
+  return { title: `${ranking.title} — Marquee`, description: ranking.meta_description };
 }
 
 export default async function AnimeRankingPage({
@@ -23,7 +21,7 @@ export default async function AnimeRankingPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const ranking = getAnimeRanking(slug);
+  const ranking = await getRankingBySlug("anime", slug);
   if (!ranking) notFound();
 
   return (
