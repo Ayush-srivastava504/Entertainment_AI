@@ -9,12 +9,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "",
     "/movies",
     "/anime",
-    "/anime/best",
-    "/movies/best",
-    "/stories",
-    "/quiz",
-    "/tools/tag-generator",
-    "/tools/thumbnail-rating",
+    "/rankings",
+    "/rankings/anime",
+    "/rankings/movies",
+    "/search",
+    "/quizzes",
     "/blog",
     "/favorites",
   ].map((path) => ({
@@ -32,12 +31,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]);
 
   const animeRoutes = animeRankings.map((r) => ({
-    url: `${BASE_URL}/anime/best/${r.slug}`,
+    url: `${BASE_URL}/anime/${r.slug}`,
     lastModified: new Date(r.published_at),
   }));
 
   const movieRoutes = movieRankings.map((r) => ({
-    url: `${BASE_URL}/movies/best/${r.slug}`,
+    url: `${BASE_URL}/movies/${r.slug}`,
     lastModified: new Date(r.published_at),
   }));
 
@@ -47,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const quizRoutes = quizzes.map((q) => ({
-    url: `${BASE_URL}/quiz/${q.slug}`,
+    url: `${BASE_URL}/quizzes/${q.slug}`,
     lastModified: new Date(q.published_at),
   }));
 

@@ -3,10 +3,9 @@ import Link from "next/link";
 const links = [
   { href: "/movies", label: "Movies" },
   { href: "/anime", label: "Anime" },
-  { href: "/anime/best", label: "Rankings" },
-  { href: "/stories", label: "Stories" },
-  { href: "/tools/tag-generator", label: "Creator Tools" },
-  { href: "/quiz", label: "Quizzes" },
+  { href: "/rankings", label: "Rankings" },
+  { href: "/search", label: "Search" },
+  { href: "/quizzes", label: "Quizzes" },
   { href: "/blog", label: "Blog" },
   { href: "/favorites", label: "★ Favorites" },
 ];

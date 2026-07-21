@@ -23,9 +23,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marquee — Discover, Create & Explore Entertainment with AI",
+  title: "Marquee — Discover anime, movies, rankings, and quizzes",
   description:
-    "AI-powered movie and anime discovery, creator tools, stories, and quizzes.",
+    "A polished entertainment marquee for browsing anime, movies, rankings, blog posts, and quizzes.",
 };
 
 export default function RootLayout({

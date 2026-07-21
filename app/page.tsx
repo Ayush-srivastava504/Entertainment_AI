@@ -4,38 +4,38 @@ const tools = [
   {
     href: "/movies",
     emoji: "🎬",
-    title: "Movie Recommender",
-    desc: "Describe a mood, not a genre. Get 5 picks that actually fit.",
+    title: "Movies Hub",
+    desc: "Browse the latest, trending, and top-rated films in one place.",
   },
   {
     href: "/anime",
     emoji: "🍥",
-    title: "Anime Finder",
-    desc: "\"White-haired MC who fights demons\" is a valid search here.",
+    title: "Anime Hub",
+    desc: "Explore anime collections with dedicated browse and search routes.",
   },
   {
-    href: "/stories",
-    emoji: "📖",
-    title: "Story Generator",
-    desc: "Pick a genre, a character, an ending. Get a story on the spot.",
+    href: "/rankings",
+    emoji: "⭐",
+    title: "Rankings",
+    desc: "Jump into curated anime and movie ranking collections.",
   },
   {
-    href: "/tools/tag-generator",
-    emoji: "🏷",
-    title: "Tag Generator",
-    desc: "YouTube, Instagram, TikTok tags for your next upload, in seconds.",
+    href: "/search",
+    emoji: "🔎",
+    title: "Search",
+    desc: "Use the unified search surface to find content across the marquee.",
   },
   {
-    href: "/tools/thumbnail-rating",
-    emoji: "🖼",
-    title: "Thumbnail Rating",
-    desc: "Upload a thumbnail, get a CTR score and concrete fixes.",
+    href: "/blog",
+    emoji: "📝",
+    title: "Blog",
+    desc: "Read fresh editorial pieces generated for the daily marquee feed.",
   },
   {
-    href: "/quiz",
+    href: "/quizzes",
     emoji: "🧠",
-    title: "Personality Quiz",
-    desc: "Generate a shareable quiz question in one click.",
+    title: "Quizzes",
+    desc: "Try shareable trivia and personality quizzes built into the experience.",
   },
 ];
 
@@ -59,9 +59,8 @@ export default function HomePage() {
             <span className="text-marquee-gold">ENTERTAINMENT, RUN ON AI</span>
           </h1>
           <p className="mt-6 max-w-xl text-marquee-textDim text-lg">
-            Discover movies and anime by mood, not metadata. Write stories,
-            generate tags, and rate thumbnails — one model, tuned for every
-            tool on this marquee.
+            Discover movies and anime through a curated marquee experience with
+            rankings, search, blog posts, and quizzes all in one place.
           </p>
           <div className="mt-8 flex gap-4">
             <Link
@@ -71,19 +70,19 @@ export default function HomePage() {
               Find something to watch
             </Link>
             <Link
-              href="/tools/tag-generator"
+              href="/rankings"
               className="rounded border border-marquee-line px-6 py-3 font-semibold text-marquee-text hover:border-marquee-gold transition focus-ring"
             >
-              Creator tools
+              Browse rankings
             </Link>
           </div>
           <p className="mt-6 text-sm text-marquee-textDim">
             Or browse{" "}
-            <Link href="/anime/best" className="underline hover:text-marquee-gold">
+            <Link href="/rankings/anime" className="underline hover:text-marquee-gold">
               anime rankings
             </Link>
             ,{" "}
-            <Link href="/movies/best" className="underline hover:text-marquee-gold">
+            <Link href="/rankings/movies" className="underline hover:text-marquee-gold">
               movie rankings
             </Link>
             , and the{" "}
