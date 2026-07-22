@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getRankingBySlug } from "@/lib/db";
 import FavoriteButton from "@/components/FavoriteButton";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

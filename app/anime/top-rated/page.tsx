@@ -7,7 +7,7 @@ export const metadata = {
   description: "Top-rated anime for your next watch list.",
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export default async function TopRatedAnimePage() {
   const items = await getAnimeSection("top-rated", "", 1, 12);

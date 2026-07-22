@@ -7,7 +7,7 @@ export const metadata = {
   description: "Popular anime across the current catalog.",
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export default async function PopularAnimePage() {
   const items = await getAnimeSection("popular", "", 1, 12);

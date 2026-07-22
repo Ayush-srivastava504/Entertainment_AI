@@ -7,7 +7,7 @@ export const metadata = {
   description: "Upcoming anime releases to keep on your radar.",
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export default async function UpcomingAnimePage() {
   const items = await getAnimeSection("upcoming", "", 1, 12);

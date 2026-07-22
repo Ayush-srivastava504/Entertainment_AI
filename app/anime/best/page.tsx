@@ -6,7 +6,7 @@ export const metadata = {
   description: "Curated anime rankings by genre, mood, and vibe.",
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export default async function AnimeRankingsIndex() {
   const rankings = await getRankings("anime");

@@ -1,32 +1,46 @@
 import { normalizeAnime, type MediaItem } from "@/lib/api/normalize";
 
-const BASE = "https://api.jikan.moe/v4";
+const JIKAN_BASE = "https://api.jikan.moe/v4";
 
 async function fetchJikan(path: string) {
-  const res = await fetch(`${BASE}${path}`, {
-    next: { revalidate: 3600 },
-    headers: {
-      Accept: "application/json",
-    },
-  });
+  try {
+    const res = await fetch(`${JIKAN_BASE}${path}`, {
+      next: { revalidate: 3600 },
+      headers: {
+        Accept: "application/json",
+      },
+    });
 
-  if (!res.ok) {
-    throw new Error(`Jikan ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      console.error(`Jikan ${res.status}: ${path}`);
+      return null;
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("Jikan fetch failed:", err);
+    return null;
   }
-
-  return res.json();
 }
 
-async function load(path: string, limit = 12): Promise<MediaItem[]> {
-  const json = await fetchJikan(path);
+async function readAnimeList(
+  path: string,
+  limit = 12
+): Promise<MediaItem[]> {
+  const data = await fetchJikan(path);
 
-  if (!Array.isArray(json.data)) {
+  if (!data || !Array.isArray(data.data)) {
     return [];
   }
 
-  return json.data
-    .map(normalizeAnime)
-    .slice(0, limit);
+  try {
+    return data.data
+      .map((item: any) => normalizeAnime(item))
+      .slice(0, limit);
+  } catch (err) {
+    console.error("Normalize anime failed:", err);
+    return [];
+  }
 }
 
 export async function getAnimeSection(
@@ -40,52 +54,54 @@ export async function getAnimeSection(
   page = 1,
   limit = 12
 ): Promise<MediaItem[]> {
-  try {
-    switch (section) {
-      case "search":
-        if (!query) return [];
-        return load(
-          `/anime?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
-          limit
-        );
+  switch (section) {
+    case "search":
+      if (!query.trim()) return [];
+      return readAnimeList(
+        `/anime?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+        limit
+      );
 
-      case "upcoming":
-        return load(
-          `/seasons/upcoming?page=${page}&limit=${limit}`,
-          limit
-        );
+    case "popular":
+      return readAnimeList(
+        `/top/anime?filter=bypopularity&page=${page}&limit=${limit}`,
+        limit
+      );
 
-      case "popular":
-        return load(
-          `/top/anime?filter=bypopularity&page=${page}&limit=${limit}`,
-          limit
-        );
+    case "top-rated":
+      return readAnimeList(
+        `/top/anime?page=${page}&limit=${limit}`,
+        limit
+      );
 
-      case "top-rated":
-        return load(
-          `/top/anime?page=${page}&limit=${limit}`,
-          limit
-        );
+    case "upcoming":
+      return readAnimeList(
+        `/seasons/upcoming?page=${page}&limit=${limit}`,
+        limit
+      );
 
-      case "trending":
-      default:
-        return load(
-          `/seasons/now?page=${page}&limit=${limit}`,
-          limit
-        );
-    }
-  } catch (err) {
-    console.error("Jikan Error:", err);
-    return [];
+    case "trending":
+    default:
+      return readAnimeList(
+        `/seasons/now?page=${page}&limit=${limit}`,
+        limit
+      );
   }
 }
 
-export async function getAnimeById(id: string) {
+export async function getAnimeById(
+  id: string
+): Promise<MediaItem | null> {
+  const data = await fetchJikan(`/anime/${id}/full`);
+
+  if (!data?.data) {
+    return null;
+  }
+
   try {
-    const json = await fetchJikan(`/anime/${id}/full`);
-    return normalizeAnime(json.data);
+    return normalizeAnime(data.data);
   } catch (err) {
-    console.error(err);
+    console.error("Normalize anime details failed:", err);
     return null;
   }
 }
@@ -93,20 +109,23 @@ export async function getAnimeById(id: string) {
 export async function getAnimeRankings(
   page = 1,
   limit = 100
-) {
-  return load(`/top/anime?page=${page}&limit=${limit}`, limit);
+): Promise<MediaItem[]> {
+  return readAnimeList(
+    `/top/anime?page=${page}&limit=${limit}`,
+    limit
+  );
 }
 
 export async function getAnimeByGenre(
   genre: string,
   page = 1,
   limit = 12
-) {
-  const all = await getAnimeRankings(page, 100);
+): Promise<MediaItem[]> {
+  const items = await getAnimeRankings(page, 100);
 
-  return all
-    .filter((a) =>
-      a.genres.some((g) =>
+  return items
+    .filter((item) =>
+      item.genres.some((g) =>
         g.toLowerCase().includes(genre.toLowerCase())
       )
     )
