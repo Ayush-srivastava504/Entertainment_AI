@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 export function SearchBar({ initialValue, path }: { initialValue?: string; path: string }) {
   const router = useRouter();
@@ -13,6 +14,7 @@ export function SearchBar({ initialValue, path }: { initialValue?: string; path:
         event.preventDefault();
         const params = new URLSearchParams();
         if (query.trim()) params.set("q", query.trim());
+        trackEvent("search", { search_term: query.trim() });
         router.push(`${path}?${params.toString()}`);
       }}
       className="flex flex-col gap-3 sm:flex-row"

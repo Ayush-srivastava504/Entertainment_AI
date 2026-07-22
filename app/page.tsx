@@ -53,7 +53,7 @@ export default function HomePage() {
               />
             ))}
           </div>
-          <h1 className="font-display text-6xl sm:text-7xl leading-[0.95] text-marquee-text tracking-wide">
+          <h1 className="font-display text-4xl sm:text-6xl md:text-7xl leading-[0.95] text-marquee-text tracking-wide">
             NOW SHOWING:
             <br />
             <span className="text-marquee-gold">ENTERTAINMENT, RUN ON AI</span>

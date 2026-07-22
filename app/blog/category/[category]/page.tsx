@@ -24,7 +24,7 @@ export default async function BlogCategoryPage({ params }: { params: Promise<{ c
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">📝 CATEGORY</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text capitalize">{category}</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text capitalize">{category}</h1>
       {posts.length === 0 && (
         <p className="mt-6 text-marquee-textDim">
           Nothing crawled in this category yet — check back after the next scheduled run.

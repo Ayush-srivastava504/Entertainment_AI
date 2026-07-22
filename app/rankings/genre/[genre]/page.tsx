@@ -36,7 +36,7 @@ export default async function GenreRankingPage({ params, searchParams }: GenreRa
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">⭐ genre</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text">{genre} rankings</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">{genre} rankings</h1>
       <p className="mt-4 max-w-2xl text-marquee-textDim">
         A blended genre ranking view for anime and movies, using the same normalized media cards as the rest of the experience.
       </p>

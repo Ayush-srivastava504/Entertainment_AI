@@ -23,7 +23,7 @@ export default function FavoritesPage() {
       <p className="font-mono text-xs text-marquee-gold tracking-marquee mb-2">
         ★ WATCHLIST
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-3">
+      <h1 className="font-display text-3xl sm:text-5xl text-marquee-text mb-3">
         Your Favorites
       </h1>
       <p className="text-marquee-textDim mb-8">

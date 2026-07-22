@@ -121,6 +121,25 @@ create index if not exists idx_comments_lookup on comments (content_type, conten
 --   alter table quizzes add column if not exists likes integer not null default 0;
 
 -- ---------------------------------------------------------------------
+-- Global chat — one shared room, anyone can post, no login (same trust
+-- model as comments). Messages are ephemeral: the API deletes anything
+-- older than 2 minutes on every read/write (see lib/db.ts
+-- getRecentChatMessages / pruneExpiredChatMessages), so nothing here is
+-- meant to be a durable record — this table should almost always be
+-- near-empty. No separate cron/cleanup job is needed because of that
+-- opportunistic delete.
+-- ---------------------------------------------------------------------
+
+create table if not exists chat_messages (
+  id            uuid primary key default gen_random_uuid(),
+  author_name   text not null,
+  body          text not null,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists idx_chat_messages_created on chat_messages (created_at desc);
+
+-- ---------------------------------------------------------------------
 -- Anime catalog — populated by crawler/jikan-crawler.mjs (source: Jikan,
 -- the free/keyless REST wrapper around MyAnimeList). Nothing in app/
 -- ever calls Jikan directly; every page reads this table.

@@ -54,11 +54,11 @@ export default async function QuizDetailPage({ params }: { params: Promise<{ slu
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🧠 QUIZ</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text">{quiz.title}</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">{quiz.title}</h1>
       <p className="mt-4 text-marquee-textDim">{quiz.description}</p>
 
       <div className="mt-10">
-        <QuizPlayer questions={quiz.questions} results={quiz.results} />
+        <QuizPlayer slug={quiz.slug} questions={quiz.questions} results={quiz.results} />
       </div>
     </div>
   );

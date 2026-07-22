@@ -18,7 +18,7 @@ export default async function BlogIndex() {
       <p className="font-mono text-xs text-marquee-gold tracking-marquee mb-2">
         📝 BLOG
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-8">
+      <h1 className="font-display text-3xl sm:text-5xl text-marquee-text mb-8">
         From the Marquee
       </h1>
       {posts.length === 0 && (

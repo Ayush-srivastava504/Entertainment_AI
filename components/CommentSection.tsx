@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 interface Comment {
   id: string;
@@ -50,6 +51,7 @@ export default function CommentSection({
       setComments((prev) => [data.comment, ...(prev ?? [])]);
       setBody("");
       setStatus("idle");
+      trackEvent("post_comment", { content_type: type, slug });
     } catch {
       setError("Could not post that comment. Try again shortly.");
       setStatus("error");

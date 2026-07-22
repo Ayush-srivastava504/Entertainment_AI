@@ -14,7 +14,7 @@ export default async function QuizzesPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🧠 QUIZZES</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text">Quizzes</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">Quizzes</h1>
       <div className="mt-8 grid gap-5 md:grid-cols-2">
         {quizzes.map((quiz) => (
           <Link key={quiz.slug} href={`/quiz/${quiz.slug}`} className="ticket p-6 hover:border-marquee-gold transition-colors">

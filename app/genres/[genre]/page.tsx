@@ -15,7 +15,7 @@ export default async function GenreBrowsePage({ params }: { params: Promise<{ ge
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🎯 GENRE</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text">{genre} picks</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">{genre} picks</h1>
       <p className="mt-4 text-marquee-textDim">
         This page is wired up as a dedicated genre hub for the next content integration pass.
       </p>

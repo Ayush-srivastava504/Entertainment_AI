@@ -295,3 +295,51 @@ export async function addComment(
   );
   return rows[0];
 }
+
+/**
+ * Global chat — one shared room, no login, matching the rest of the
+ * site's trust model. Messages are intentionally ephemeral: instead of a
+ * scheduled job or a separate worker, every read AND write opportunistically
+ * deletes anything older than CHAT_TTL first. On a low/medium-traffic site
+ * this keeps the table near-empty without any extra infrastructure — the
+ * tradeoff is that a message can very rarely live a few seconds past 2
+ * minutes if there's a lull in traffic, but never meaningfully longer.
+ */
+export interface ChatMessageRow {
+  id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+const CHAT_TTL = "2 minutes";
+
+async function pruneExpiredChatMessages(): Promise<void> {
+  await getPool().query(
+    `delete from chat_messages where created_at < now() - interval '${CHAT_TTL}'`
+  );
+}
+
+export async function getRecentChatMessages(): Promise<ChatMessageRow[]> {
+  await pruneExpiredChatMessages();
+  const { rows } = await getPool().query<ChatMessageRow>(
+    `select id, author_name, body, created_at from chat_messages
+     where created_at > now() - interval '${CHAT_TTL}'
+     order by created_at asc`
+  );
+  return rows;
+}
+
+export async function addChatMessage(
+  authorName: string,
+  body: string
+): Promise<ChatMessageRow> {
+  await pruneExpiredChatMessages();
+  const { rows } = await getPool().query<ChatMessageRow>(
+    `insert into chat_messages (author_name, body)
+     values ($1, $2)
+     returning id, author_name, body, created_at`,
+    [authorName, body]
+  );
+  return rows[0];
+}

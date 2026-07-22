@@ -18,7 +18,7 @@ export default function AnimePage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🍥 ANIME</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text">Anime hub</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">Anime hub</h1>
       <p className="mt-4 max-w-2xl text-marquee-textDim">
         Jump into curated anime browse paths without the old AI-only experience.
       </p>

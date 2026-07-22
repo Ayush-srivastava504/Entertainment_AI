@@ -37,7 +37,7 @@ export default async function BlogPostPage({
           day: "numeric",
         })}
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-4">
+      <h1 className="font-display text-3xl sm:text-5xl text-marquee-text mb-4">
         {post.title}
       </h1>
       <div className="mb-8">

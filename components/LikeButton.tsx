@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 interface LikeButtonProps {
   type: "blog" | "quiz";
@@ -30,6 +31,7 @@ export default function LikeButton({ type, slug, initialLikes }: LikeButtonProps
     setLiked(true);
     setLikes((n) => n + 1);
     localStorage.setItem(storageKey(type, slug), "1");
+    trackEvent("like_content", { content_type: type, slug });
 
     try {
       const res = await fetch("/api/like", {

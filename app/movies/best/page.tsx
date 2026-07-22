@@ -16,7 +16,7 @@ export default async function MovieRankingsIndex() {
       <p className="font-mono text-xs text-marquee-gold tracking-marquee mb-2">
         ⭐ RANKINGS
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-8">
+      <h1 className="font-display text-3xl sm:text-5xl text-marquee-text mb-8">
         Best Movie Rankings
       </h1>
       {rankings.length === 0 && (

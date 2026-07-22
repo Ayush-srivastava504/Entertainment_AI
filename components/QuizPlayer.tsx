@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { QuizQuestion, QuizResultTier } from "@/lib/db";
+import { trackEvent } from "@/lib/analytics";
 
 export default function QuizPlayer({
+  slug,
   questions,
   results,
 }: {
+  slug?: string;
   questions: QuizQuestion[];
   results: QuizResultTier[];
 }) {
@@ -18,17 +21,29 @@ export default function QuizPlayer({
   const question = questions[step];
   const isLastQuestion = step + 1 === questions.length;
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    trackEvent("quiz_start", { slug, question_count: questions.length });
+  }, []);
+
   function choose(optionIndex: number) {
     if (selected !== null) return; // already answered this question
     setSelected(optionIndex);
-    if (question.options[optionIndex].correct) {
+    const correct = question.options[optionIndex].correct;
+    if (correct) {
       setScore((s) => s + 1);
     }
+    trackEvent("quiz_answer", { slug, question_index: step, correct });
   }
 
   function next() {
     if (isLastQuestion) {
       setFinished(true);
+      trackEvent("quiz_complete", {
+        slug,
+        score,
+        question_count: questions.length,
+      });
       return;
     }
     setStep((s) => s + 1);

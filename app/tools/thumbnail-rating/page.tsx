@@ -119,7 +119,7 @@ export default function ThumbnailRatingPage() {
       <p className="font-mono text-xs text-marquee-gold tracking-marquee mb-2">
         🖼 CREATOR TOOLS
       </p>
-      <h1 className="font-display text-5xl text-marquee-text mb-3">
+      <h1 className="font-display text-3xl sm:text-5xl text-marquee-text mb-3">
         AI Thumbnail Rating
       </h1>
       <p className="text-marquee-textDim mb-8">

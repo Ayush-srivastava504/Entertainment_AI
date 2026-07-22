@@ -23,6 +23,14 @@ import { withRetry, RetryableError } from "./lib/retry.mjs";
 const REQUEST_DELAY_MS = 5200; // stay under OpenTDB's 1 req/5s limit
 const DEFAULT_AMOUNT = 10;
 
+// response_code meanings (https://opentdb.com/api_config.php):
+//   0 = Success  1 = No Results  2 = Invalid Parameter
+//   3 = Token Not Found  4 = Token Empty  5 = Rate Limit
+// Codes 4 and 5 are transient/recoverable; everything else means this
+// deck genuinely can't be fetched right now (bad params, or the category
+// truly doesn't have `amount` fresh questions left for this token).
+const RETRYABLE_RESPONSE_CODES = new Set([4, 5]);
+
 // OpenTDB category ids for entertainment topics this site cares about.
 const DECKS = [
   { slug: "film-trivia", title: "Film Trivia", category: 11, description: "How well do you know movies? Test your film knowledge." },
@@ -87,20 +95,84 @@ function tiersFor(total) {
   ];
 }
 
-async function fetchDeck(category, amount) {
-  const url = `https://opentdb.com/api.php?amount=${amount}&category=${category}&type=multiple`;
-  const res = await withRetry(async () => {
-    const r = await fetch(url);
-    if (r.status === 429) throw new RetryableError("OpenTDB rate limited (429)");
-    if (!r.ok) throw new Error(`OpenTDB ${r.status}`);
-    return r;
-  });
-  const data = await res.json();
-  // response_code: 0 = success. Anything else means "not enough questions
-  // for this filter" or a transient OpenTDB issue — skip the deck this run.
-  if (data.response_code !== 0 || !Array.isArray(data.results) || data.results.length === 0) {
-    throw new Error(`OpenTDB returned response_code=${data.response_code} for category ${category}`);
+// A session token makes OpenTDB track which questions this crawler run
+// has already seen, so re-running against a category with a small pool
+// doesn't immediately hand back response_code=4 ("Token Empty"). Session
+// tokens are free/keyless and expire after 6 hours of inactivity — one
+// per crawler run is plenty; failing to get one just means we fall back
+// to tokenless requests instead of aborting the whole run.
+async function requestSessionToken() {
+  try {
+    const res = await withRetry(
+      async () => {
+        const r = await fetch("https://opentdb.com/api_token.php?command=request");
+        if (!r.ok) throw new RetryableError(`OpenTDB token request ${r.status}`);
+        return r;
+      },
+      { retries: 3, label: "opentdb token request" }
+    );
+    const data = await res.json();
+    return data.response_code === 0 ? data.token : null;
+  } catch (err) {
+    console.warn(`trivia: could not get an OpenTDB session token (${err.message}) — continuing without one`);
+    return null;
   }
+}
+
+async function resetSessionToken(token) {
+  try {
+    await fetch(`https://opentdb.com/api_token.php?command=reset&token=${token}`);
+  } catch {
+    // best-effort; a failed reset just means the next fetch may 404/4 again
+  }
+}
+
+/**
+ * Fetches one deck's raw questions from OpenTDB.
+ *
+ * The important fix here: OpenTDB reports rate-limiting and an
+ * exhausted session token via `response_code` inside a 200 OK JSON body
+ * — NOT via an HTTP 429/5xx status. The previous version only inspected
+ * `r.status` inside withRetry(), so a response_code=5 (rate limit) or
+ * =4 (token empty) slipped past the HTTP-level check, got parsed as
+ * "success", and then threw a plain (non-retried) Error that caused the
+ * whole deck to be skipped for the rest of the run — even though the
+ * very next request, 5 seconds later, would usually have succeeded.
+ * Now the response_code check happens *inside* the retried callback, so
+ * those two transient cases actually get retried with backoff.
+ */
+async function fetchDeck(category, amount, token) {
+  const baseUrl = `https://opentdb.com/api.php?amount=${amount}&category=${category}&type=multiple`;
+
+  const data = await withRetry(
+    async () => {
+      const url = token ? `${baseUrl}&token=${token}` : baseUrl;
+      const r = await fetch(url);
+      if (r.status === 429) throw new RetryableError("OpenTDB rate limited (HTTP 429)");
+      if (!r.ok) throw new Error(`OpenTDB HTTP ${r.status}`);
+
+      const body = await r.json();
+
+      if (body.response_code === 4 && token) {
+        // Token has served every question in this category — reset it so
+        // the retry can see the full pool again instead of failing forever.
+        await resetSessionToken(token);
+        throw new RetryableError("OpenTDB token exhausted (response_code=4), reset and retrying");
+      }
+      if (RETRYABLE_RESPONSE_CODES.has(body.response_code)) {
+        throw new RetryableError(`OpenTDB response_code=${body.response_code} (transient), retrying`);
+      }
+      if (body.response_code !== 0 || !Array.isArray(body.results) || body.results.length === 0) {
+        // Non-retryable: bad params, or genuinely not enough questions in
+        // this category for the requested amount. Abort this deck now
+        // rather than burning through retries that can't succeed.
+        throw new Error(`OpenTDB returned response_code=${body.response_code} for category ${category}`);
+      }
+      return body;
+    },
+    { retries: 5, baseDelayMs: 5200, label: `opentdb category ${category}` }
+  );
+
   return data.results;
 }
 
@@ -121,10 +193,15 @@ async function main() {
   const amountArg = args.find((a) => a.startsWith("--amount="));
   const amount = amountArg ? parseInt(amountArg.split("=")[1], 10) : DEFAULT_AMOUNT;
 
+  const token = await requestSessionToken();
+  if (token) {
+    console.log("trivia: using an OpenTDB session token for this run");
+  }
+
   const rows = [];
   for (const deck of DECKS) {
     try {
-      const raw = await fetchDeck(deck.category, amount);
+      const raw = await fetchDeck(deck.category, amount, token);
       const questions = toQuestions(raw);
       rows.push({
         slug: deck.slug,

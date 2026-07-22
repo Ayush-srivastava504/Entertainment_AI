@@ -61,7 +61,7 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
         </div>
         <div>
           <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🍥 detail</p>
-          <h1 className="mt-3 font-display text-5xl text-marquee-text">{anime.title}</h1>
+          <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">{anime.title}</h1>
           <p className="mt-4 text-marquee-textDim">{anime.description}</p>
           <div className="mt-6 flex flex-wrap gap-2 text-sm text-marquee-textDim">
             {anime.year ? <span className="rounded border border-marquee-line px-3 py-1">{anime.year}</span> : null}

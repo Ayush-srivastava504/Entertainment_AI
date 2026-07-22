@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { isFavorite, toggleFavorite } from "@/lib/favorites";
+import { trackEvent } from "@/lib/analytics";
 
 interface FavoriteButtonProps {
   id: string;
@@ -19,7 +20,14 @@ export default function FavoriteButton({ id, type, title }: FavoriteButtonProps)
 
   return (
     <button
-      onClick={() => setSaved(toggleFavorite({ id, type, title }))}
+      onClick={() => {
+        const nowSaved = toggleFavorite({ id, type, title });
+        setSaved(nowSaved);
+        trackEvent(nowSaved ? "add_to_favorites" : "remove_from_favorites", {
+          content_type: type,
+          content_id: id,
+        });
+      }}
       aria-pressed={saved}
       className={`text-xs font-mono rounded border px-2 py-1 transition focus-ring ${
         saved

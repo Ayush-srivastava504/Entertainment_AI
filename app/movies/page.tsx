@@ -18,7 +18,7 @@ export default function MoviesPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🎬 MOVIES</p>
-      <h1 className="mt-3 font-display text-5xl text-marquee-text">Movies hub</h1>
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">Movies hub</h1>
       <p className="mt-4 max-w-2xl text-marquee-textDim">
         Travel through the movie marquee with dedicated browsing routes for every mood and release window.
       </p>
