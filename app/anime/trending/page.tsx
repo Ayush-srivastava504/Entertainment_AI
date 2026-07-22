@@ -7,7 +7,7 @@ export const metadata = {
   description: "Trending anime for the moment.",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export default async function TrendingAnimePage() {
   const items = await getAnimeSection("trending", "", 1, 12);
