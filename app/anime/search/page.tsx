@@ -1,7 +1,7 @@
 import { MediaShell } from "@/components/media/MediaShell";
 import { MediaGrid } from "@/components/media/MediaGrid";
 import { SearchBar } from "@/components/media/SearchBar";
-import { getAnimeSection } from "@/lib/api/jikan";
+import { getAnimeSection } from "@/lib/api/anime";
 
 export const metadata = {
   title: "Search Anime — Marquee",

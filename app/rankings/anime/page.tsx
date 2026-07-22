@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAnimeRankings } from "@/lib/api/jikan";
+import { getAnimeRankings } from "@/lib/api/anime";
 
 export const revalidate = 3600;
 

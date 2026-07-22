@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMovieById } from "@/lib/api/tmdb";
+import { getMovieById } from "@/lib/api/movies";
 
 export const metadata = {
   title: "Movie Detail — Marquee",

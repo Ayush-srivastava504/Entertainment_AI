@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAnimeById } from "@/lib/api/jikan";
+import { getAnimeById } from "@/lib/api/anime";
 
 export const metadata = {
   title: "Anime Detail — Marquee",

@@ -6,8 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:migrate": "node crawler/migrate.mjs",
+    "crawl:anime": "node crawler/jikan-crawler.mjs",
+    "crawl:anime:full": "node crawler/jikan-crawler.mjs --full",
+    "crawl:movies": "node crawler/yts-crawler.mjs",
+    "crawl:movies:full": "node crawler/yts-crawler.mjs --full",
+    "crawl:all": "npm run crawl:anime && npm run crawl:movies",
+    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full"
   },
+
   "dependencies": {
     "next": "16.2.10",
     "pg": "^8.12.0",

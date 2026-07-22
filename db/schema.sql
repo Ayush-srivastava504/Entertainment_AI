@@ -93,3 +93,88 @@ create index if not exists idx_comments_lookup on comments (content_type, conten
 --   alter table blog_posts add column if not exists likes integer not null default 0;
 --   alter table quizzes add column if not exists likes integer not null default 0;
 
+-- ---------------------------------------------------------------------
+-- Anime catalog — populated by crawler/jikan-crawler.mjs (source: Jikan,
+-- the free/keyless REST wrapper around MyAnimeList). Nothing in app/
+-- ever calls Jikan directly; every page reads this table.
+-- ---------------------------------------------------------------------
+
+create extension if not exists pg_trgm; -- fast ILIKE search on title
+
+create table if not exists anime (
+  id             text primary key,        -- Jikan mal_id
+  title          text not null,
+  title_english  text,
+  synopsis       text,
+  poster_url     text,
+  trailer_url    text,
+  year           integer,
+  score          numeric,
+  popularity     integer,                 -- lower = more popular (Jikan convention)
+  rank           integer,
+  episodes       integer,
+  status         text,                    -- 'Currently Airing' | 'Finished Airing' | 'Not yet aired'
+  type           text,                    -- TV | Movie | OVA | ...
+  genres         text[] not null default '{}',
+  studios        text[] not null default '{}',
+  aired_from     date,
+  aired_to       date,
+  raw            jsonb not null,          -- full Jikan payload, for future fields without a migration
+  updated_at     timestamptz not null default now()
+);
+
+create index if not exists idx_anime_score on anime (score desc nulls last);
+create index if not exists idx_anime_popularity on anime (popularity asc nulls last);
+create index if not exists idx_anime_year on anime (year desc nulls last);
+create index if not exists idx_anime_status on anime (status);
+create index if not exists idx_anime_genres on anime using gin (genres);
+create index if not exists idx_anime_title_trgm on anime using gin (title gin_trgm_ops);
+
+-- ---------------------------------------------------------------------
+-- Movie catalog — populated by crawler/yts-crawler.mjs (source: YTS.mx,
+-- a free, keyless movie API — used instead of TMDB, which requires an
+-- API key and per-request quotas). Nothing in app/ ever calls YTS
+-- directly; every page reads this table.
+-- ---------------------------------------------------------------------
+
+create table if not exists movies (
+  id              text primary key,       -- YTS movie id
+  imdb_code       text,
+  title           text not null,
+  description     text,
+  poster_url      text,
+  background_url  text,
+  trailer_url     text,
+  year            integer,
+  score           numeric,                -- 0-10
+  runtime         integer,                -- minutes
+  genres          text[] not null default '{}',
+  language        text,
+  download_count  integer,                -- used as a popularity/trending proxy
+  like_count      integer,
+  date_uploaded   timestamptz,            -- used as a "recently added" proxy for upcoming/latest
+  raw             jsonb not null,
+  updated_at      timestamptz not null default now()
+);
+
+create index if not exists idx_movies_score on movies (score desc nulls last);
+create index if not exists idx_movies_downloads on movies (download_count desc nulls last);
+create index if not exists idx_movies_year on movies (year desc nulls last);
+create index if not exists idx_movies_uploaded on movies (date_uploaded desc nulls last);
+create index if not exists idx_movies_genres on movies using gin (genres);
+create index if not exists idx_movies_title_trgm on movies using gin (title gin_trgm_ops);
+
+-- ---------------------------------------------------------------------
+-- Crawl bookkeeping — one row per source, so the background sync knows
+-- what it last did without needing an external scheduler's state.
+-- ---------------------------------------------------------------------
+
+create table if not exists sync_state (
+  source              text primary key,   -- 'jikan' | 'yts'
+  last_run_at         timestamptz,
+  last_full_sync_at   timestamptz,
+  last_pages_crawled  integer,
+  last_rows_upserted  integer
+);
+
+

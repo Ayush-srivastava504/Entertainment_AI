@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAnimeByGenre } from "@/lib/api/jikan";
-import { getMovieByGenre } from "@/lib/api/tmdb";
+import { getAnimeByGenre } from "@/lib/api/anime";
+import { getMovieByGenre } from "@/lib/api/movies";
 
 const allowedGenres = ["action", "comedy", "drama", "fantasy", "horror", "romance", "thriller"];
 

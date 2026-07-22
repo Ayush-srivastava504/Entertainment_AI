@@ -1,6 +1,6 @@
 import { MediaShell } from "@/components/media/MediaShell";
 import { MediaGrid } from "@/components/media/MediaGrid";
-import { getAnimeSection } from "@/lib/api/jikan";
+import { getAnimeSection } from "@/lib/api/anime";
 
 export const metadata = {
   title: "Top Rated Anime — Marquee",

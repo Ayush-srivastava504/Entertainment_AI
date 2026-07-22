@@ -1,6 +1,6 @@
 import { MediaShell } from "@/components/media/MediaShell";
 import { MediaGrid } from "@/components/media/MediaGrid";
-import { getMovieSection } from "@/lib/api/tmdb";
+import { getMovieSection } from "@/lib/api/movies";
 
 export const metadata = {
   title: "Popular Movies — Marquee",

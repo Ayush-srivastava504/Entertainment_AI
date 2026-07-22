@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAnimeSection } from "@/lib/api/jikan";
+import { getAnimeSection } from "@/lib/api/anime";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

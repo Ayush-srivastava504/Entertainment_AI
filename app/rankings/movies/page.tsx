@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getMovieRankings } from "@/lib/api/tmdb";
+import { getMovieRankings } from "@/lib/api/movies";
 
 export const revalidate = 3600;
 
