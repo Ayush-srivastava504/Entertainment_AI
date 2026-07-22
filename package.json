@@ -10,9 +10,8 @@
     "db:migrate": "node crawler/migrate.mjs",
     "crawl:anime": "node crawler/jikan-crawler.mjs",
     "crawl:anime:full": "node crawler/jikan-crawler.mjs --full",
-    "crawl:movies": "node crawler/trakt-crawler.mjs",
-    "crawl:movies:full": "node crawler/trakt-crawler.mjs --full",
-    "crawl:posters": "node crawler/omdb-posters.mjs",
+    "crawl:movies": "node crawler/tmdb-crawler.mjs",
+    "crawl:movies:full": "node crawler/tmdb-crawler.mjs --full",
     "crawl:all": "npm run crawl:anime && npm run crawl:movies",
     "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full"
   },

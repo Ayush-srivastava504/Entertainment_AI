@@ -131,37 +131,37 @@ create index if not exists idx_anime_genres on anime using gin (genres);
 create index if not exists idx_anime_title_trgm on anime using gin (title gin_trgm_ops);
 
 -- ---------------------------------------------------------------------
--- Movie catalog — populated by crawler/trakt-crawler.mjs (source:
--- Trakt.tv, a free API — free client_id, self-serve, instant, no
--- approval wait). Poster art is optionally backfilled by
--- crawler/omdb-posters.mjs (source: OMDb, free key) since Trakt itself
--- doesn't host images. Nothing in app/ ever calls Trakt or OMDb
--- directly; every page reads this table.
+-- Movie catalog — populated by crawler/tmdb-crawler.mjs (source:
+-- TMDB, The Movie Database — free read access token, self-serve,
+-- instant, no approval wait). TMDB hosts poster/backdrop images
+-- directly, so no separate poster-backfill step is needed. Nothing
+-- in app/ ever calls TMDB directly; every page reads this table.
 --
--- (Earlier revisions of this project used YTS.mx. That's a torrent/
--- piracy site, not a legitimate metadata API, and its domain has since
--- been taken down by copyright enforcement — removed for good reason.)
+-- (Earlier revisions of this project used Trakt.tv, and before that
+-- YTS.mx — a torrent/piracy site, not a legitimate metadata API, whose
+-- domain has since been taken down by copyright enforcement. Both were
+-- replaced for good reason.)
 -- ---------------------------------------------------------------------
 
 create table if not exists movies (
-  id              text primary key,       -- Trakt id
+  id              text primary key,       -- TMDB id
   imdb_code       text,
-  tmdb_id         text,
+  tmdb_id         text,                   -- same value as id, kept for clarity/back-compat
   slug            text,
   title           text not null,
   tagline         text,
   description     text,
-  poster_url      text,                   -- filled by omdb-posters.mjs, null until then
-  background_url  text,
+  poster_url      text,                   -- from TMDB poster_path, filled by tmdb-crawler.mjs
+  background_url  text,                   -- from TMDB backdrop_path
   trailer_url     text,
   year            integer,
-  score           numeric,                -- 0-10, Trakt community rating
+  score           numeric,                -- 0-10, TMDB vote average
   runtime         integer,                -- minutes
   genres          text[] not null default '{}',
   language        text,
-  watchers        integer,                -- currently watching (trending signal)
-  plays           integer,                -- all-time play count (popularity signal)
-  list_count      integer,                -- watchlist adds (anticipated/upcoming signal)
+  watchers        integer,                -- from trending/movie/week popularity (trending signal)
+  plays           integer,                -- from movie/popular popularity (popularity signal)
+  list_count      integer,                -- from movie/upcoming popularity (anticipated/upcoming signal)
   released_at     date,
   raw             jsonb not null,
   updated_at      timestamptz not null default now()

@@ -1,13 +1,10 @@
 /**
  * Movie reads — Postgres only. Never calls an external API directly.
  *
- * Source is Trakt.tv (crawler/trakt-crawler.mjs), a legitimate free
- * media-tracking API — used instead of TMDB (needs a paid-tier quota to
- * run at crawl volume) and instead of YTS (a torrent/piracy index, not
- * a real metadata API — its domain has since been taken down by
- * copyright enforcement, which is exactly why it doesn't belong here).
- * Poster art is optionally backfilled from OMDb by crawler/omdb-posters.mjs;
- * rows without one just render a placeholder.
+ * Source is TMDB (The Movie Database) via crawler/tmdb-crawler.mjs — a
+ * free, self-serve metadata API that also hosts poster/backdrop images
+ * directly, so no separate poster-backfill step is needed. Rows without
+ * a poster_path just render a placeholder.
  */
 import { getPool } from "@/lib/db";
 import { cached } from "@/lib/cache";
@@ -28,7 +25,7 @@ function rowToMedia(row: any): MediaItem {
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
     genres: row.genres ?? [],
-    source: "trakt",
+    source: "tmdb",
   };
 }
 
@@ -62,7 +59,7 @@ export async function getMovieSection(
         params = [limit, offset];
         break;
       case "upcoming":
-        // Real anticipated-release data (Trakt watchlist adds), not a
+        // Real anticipated-release data (TMDB movie/upcoming popularity), not a
         // "recently added to the catalog" approximation.
         sql = `select * from movies where released_at is null or released_at > now()
                order by list_count desc nulls last limit $1 offset $2`;
