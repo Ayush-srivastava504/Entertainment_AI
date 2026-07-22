@@ -4,7 +4,7 @@ import { getBlogPosts } from "@/lib/db";
 
 const allowedCategories = ["movies", "tv", "anime", "celebrities", "gaming"];
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: Promise<{ category: string }> }) {
   const { category } = await params;

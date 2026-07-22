@@ -8,7 +8,7 @@ export const metadata = {
 
 // New posts land in the DB once a day via pipeline/generate_content.py.
 // Revalidate periodically so they show up without a redeploy.
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export default async function BlogIndex() {
   const posts = await getBlogPosts();
