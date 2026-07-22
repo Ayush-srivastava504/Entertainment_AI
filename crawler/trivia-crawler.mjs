@@ -3,12 +3,9 @@
  * free, keyless Open Trivia Database (opentdb.com) and upserts one "deck"
  * per category into the `quizzes` table.
  *
- * This REPLACES the old personality-quiz generator that used to run in
- * pipeline/generate_content.py on EC2 (LLM-written questions with no
- * external grounding, one result per "personality type"). Trivia quizzes
- * instead have real correct/incorrect answers and a score-based result
- * tier (see QuizPlayer.tsx) — same pattern as the blog crawler pulling
- * real RSS data instead of LLM-invented blog posts.
+ * Trivia quizzes have real correct/incorrect answers and a score-based
+ * result tier (see QuizPlayer.tsx) — same pattern as the blog crawler
+ * pulling real RSS data instead of LLM-invented blog posts.
  *
  * OpenTDB is rate-limited to one request per 5s per IP, hence the sleep
  * between categories below.

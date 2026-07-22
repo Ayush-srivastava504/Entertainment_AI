@@ -6,7 +6,7 @@ export const metadata = {
   description: "Watch orders, timelines, and deep dives on movies and anime.",
 };
 
-// New posts land in the DB once a day via pipeline/generate_content.py.
+// New posts land in the DB via the scheduled blog crawler (see crawler/blog-crawler.mjs).
 // Revalidate periodically so they show up without a redeploy.
 export const revalidate = 300;
 

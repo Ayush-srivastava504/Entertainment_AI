@@ -1,9 +1,7 @@
 /**
  * Blog crawler — fetches trending entertainment news from trusted RSS
  * feeds (movies, TV, anime, celebrities, gaming), summarizes each item,
- * and stores it in `blog_posts`. This is now the only writer for that
- * table — the old EC2 pipeline that used to also write LLM-invented
- * "evergreen" posts here has been removed.
+ * and stores it in `blog_posts`. This is the only writer for that table.
  *
  * Summarization: this crawler has no dependency on the AI Creator service
  * (that's a separate build, task #3) — it produces a short EXTRACTIVE

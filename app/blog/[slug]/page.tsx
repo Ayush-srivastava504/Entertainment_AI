@@ -4,7 +4,7 @@ import LikeButton from "@/components/LikeButton";
 import CommentSection from "@/components/CommentSection";
 
 export const revalidate = 300;
-// Slugs are DB-driven (written by the daily pipeline run), not known at
+// Slugs are DB-driven (written by the scheduled blog crawler), not known at
 // build time, so no generateStaticParams — Next.js renders on-demand and
 // caches per the revalidate window above.
 

@@ -29,7 +29,7 @@ function rateLimited(key: string): boolean {
 }
 
 // A hard cap on any single input field so nobody can queue a multi-MB
-// prompt (protects both Postgres and the HF Space request body size).
+// prompt (protects both Postgres and the downstream AI request body size).
 const MAX_FIELD_LENGTH = 2000;
 
 function validateInput(input: unknown): input is Record<string, string> {
@@ -73,8 +73,8 @@ export async function POST(req: NextRequest) {
   }
 
   // We still keep a queue_jobs row (useful history/audit trail + the
-  // existing polling UI keeps working), but it's resolved inline in this
-  // same request now instead of waiting for a daily EC2 batch job.
+  // existing polling UI keeps working), even though it's resolved inline
+  // within this same request rather than a separate batch job.
   let jobId: string;
   try {
     const job = await createQueueJob(task as Task, input);

@@ -1,8 +1,7 @@
 -- Shared Postgres schema.
 -- Vercel (Next.js) inserts rows and reads results back in the same request
--- (see lib/ai.ts + app/api/queue/route.ts — this calls the free Hugging
--- Face Space in hf-space/ synchronously; there is no longer a separate
--- daily batch job to wait on).
+-- (see lib/ai.ts + app/api/queue/route.ts — this calls an external AI
+-- endpoint synchronously; there is no separate daily batch job to wait on).
 --
 -- Run this once against whichever Postgres you provision (Neon / Supabase /
 -- RDS / any reachable Postgres).
@@ -28,10 +27,8 @@ create index if not exists idx_queue_jobs_created on queue_jobs (created_at desc
 --  crawler/blog-crawler.mjs (GitHub Actions, scheduled) — real trending
 --  news pulled from RSS feeds (movies/TV/anime/celebrities/gaming),
 --  extractively summarized (or abstractively, if AI_SUMMARY_ENDPOINT is
---  set), always attributed via source_name/source_url.
--- (The old EC2 pipeline used to also write LLM-invented "evergreen"
--- posts here with no external grounding — that job has been removed;
--- every row now traces back to a real source.)
+--  set), always attributed via source_name/source_url. Every row traces
+--  back to a real source.
 -- ---------------------------------------------------------------------
 
 create table if not exists blog_posts (
@@ -79,9 +76,7 @@ create index if not exists idx_rankings_category on rankings (category, publishe
 
 -- Trivia quizzes — populated by crawler/trivia-crawler.mjs (source:
 -- OpenTDB, free/keyless), on a schedule (see .github/workflows/sync.yml).
--- This replaced the old EC2 pipeline's LLM-generated "personality quiz"
--- format entirely: every question now has one real correct answer instead
--- of mapping to a personality-type key.
+-- Every question has one real correct answer.
 --   questions: [{ text, options: [{ text, correct: boolean }] }]
 --   results:   [{ minScore, maxScore, title, description }]  -- score tiers
 create table if not exists quizzes (

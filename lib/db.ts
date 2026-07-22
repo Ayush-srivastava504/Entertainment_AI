@@ -60,9 +60,9 @@ export async function getQueueJob(id: string): Promise<QueueJob | null> {
   return rows[0] ?? null;
 }
 
-// Resolved inline by app/api/queue/route.ts now (calls the HF Space
-// synchronously) instead of being drained once a day by the old EC2 batch
-// job — these just record the outcome for history/debugging.
+// Resolved inline by app/api/queue/route.ts (calls the AI endpoint
+// synchronously) rather than being drained by a separate batch job —
+// these just record the outcome for history/debugging.
 export async function markQueueJobDone(id: string, result: string): Promise<void> {
   await getPool().query(
     `update queue_jobs set status = 'done', result = $2, completed_at = now() where id = $1`,
@@ -79,9 +79,10 @@ export async function markQueueJobFailed(id: string, error: string): Promise<voi
 
 /**
  * Autonomous content — read-only from the frontend's point of view.
- * Every row here was written by pipeline/generate_content.py once a day,
- * not by anything a user submitted. No writer functions exist here on
- * purpose: the app never creates or edits this content, only reads it.
+ * Every row here is written by the scheduled crawlers (crawler/*.mjs via
+ * GitHub Actions), not by anything a user submitted. No writer functions
+ * exist here on purpose: the app never creates or edits this content,
+ * only reads it.
  */
 
 export interface BlogPostRow {

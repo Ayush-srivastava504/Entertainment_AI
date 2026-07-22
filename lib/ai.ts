@@ -1,9 +1,9 @@
 /**
- * Server-only call to the free-tier Hugging Face Space defined in
- * `hf-space/` (see hf-space/README.md). This is what replaced the old
- * EC2 batch pipeline: instead of queuing a job and waiting for a daily
- * batch run to drain it, API routes call this directly and return the
- * result in the same request.
+ * Server-only call to an external AI text-generation endpoint. Optional —
+ * if HF_SPACE_URL isn't set (it currently isn't; this app runs on Vercel
+ * only, nothing else deployed), the on-demand AI tools just return a
+ * friendly "unavailable" error and every other part of the site works
+ * as normal.
  *
  * NEVER import this from a client component — HF_SPACE_URL/HF_TOKEN must
  * stay server-side. All callers of buildPrompt/generateWithAI live under
@@ -21,8 +21,9 @@ export async function generateWithAI(
   const url = process.env.HF_SPACE_URL;
   if (!url) {
     throw new AiUnavailableError(
-      "HF_SPACE_URL is not configured. Deploy hf-space/ and set HF_SPACE_URL " +
-        "in your environment to enable this tool."
+      "HF_SPACE_URL is not configured, so this AI tool is unavailable. " +
+        "Set HF_SPACE_URL in your environment to point at an AI endpoint " +
+        "to enable it."
     );
   }
 
@@ -31,7 +32,7 @@ export async function generateWithAI(
 
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    // Only needed if the Space is private — see hf-space/README.md.
+    // Only needed if the AI endpoint requires auth.
     if (process.env.HF_TOKEN) {
       headers.Authorization = `Bearer ${process.env.HF_TOKEN}`;
     }
@@ -48,12 +49,12 @@ export async function generateWithAI(
     });
 
     if (!res.ok) {
-      throw new AiUnavailableError(`HF Space responded ${res.status}`);
+      throw new AiUnavailableError(`AI endpoint responded ${res.status}`);
     }
 
     const data = (await res.json()) as { text?: string };
     if (!data.text) {
-      throw new AiUnavailableError("HF Space returned an empty response.");
+      throw new AiUnavailableError("AI endpoint returned an empty response.");
     }
     return data.text.trim();
   } catch (err) {
