@@ -22,10 +22,28 @@ const mono = IBM_Plex_Mono({
   variable: "--font-mono",
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+
 export const metadata: Metadata = {
-  title: "Marquee — Discover anime, movies, rankings, and quizzes",
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: "Marquee — Discover anime, movies, rankings, and quizzes",
+    template: "%s",
+  },
   description:
     "A polished entertainment marquee for browsing anime, movies, rankings, blog posts, and quizzes.",
+  openGraph: {
+    siteName: "Marquee",
+    type: "website",
+    url: BASE_URL,
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

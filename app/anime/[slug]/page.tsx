@@ -2,18 +2,59 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAnimeById } from "@/lib/api/anime";
 
-export const metadata = {
-  title: "Anime Detail — Marquee",
-  description: "Anime detail route placeholder.",
-};
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const anime = await getAnimeById(slug);
+  if (!anime) return {};
+
+  const url = `${BASE_URL}/anime/${slug}`;
+  const title = anime.year ? `${anime.title} (${anime.year}) — Marquee` : `${anime.title} — Marquee`;
+  const description = anime.description || `Details, rating, and genres for ${anime.title}.`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: anime.title,
+      description,
+      url,
+      type: "video.tv_show",
+      images: anime.posterUrl ? [{ url: anime.posterUrl }] : undefined,
+    },
+    twitter: {
+      card: anime.posterUrl ? "summary_large_image" : "summary",
+      title: anime.title,
+      description,
+      images: anime.posterUrl ? [anime.posterUrl] : undefined,
+    },
+  };
+}
 
 export default async function AnimeDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const anime = await getAnimeById(slug);
   if (!anime) notFound();
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    name: anime.title,
+    image: anime.posterUrl || undefined,
+    description: anime.description || undefined,
+    genre: anime.genres,
+    ...(anime.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: anime.score, bestRating: 10 } } : {}),
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded border border-marquee-line bg-marquee-panel">
           {anime.posterUrl ? <img src={anime.posterUrl} alt={anime.title} className="h-full w-full object-cover" /> : <div className="p-8 text-sm text-marquee-textDim">No poster</div>}

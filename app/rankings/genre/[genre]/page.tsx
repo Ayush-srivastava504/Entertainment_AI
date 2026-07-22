@@ -5,10 +5,15 @@ import { getMovieByGenre } from "@/lib/api/movies";
 
 const allowedGenres = ["action", "comedy", "drama", "fantasy", "horror", "romance", "thriller"];
 
-export const metadata = {
-  title: "Genre Rankings — Marquee",
-  description: "Browse rankings by genre across anime and movies.",
-};
+export async function generateMetadata({ params }: { params: Promise<{ genre: string }> }) {
+  const { genre } = await params;
+  if (!allowedGenres.includes(genre)) return {};
+  const label = genre.charAt(0).toUpperCase() + genre.slice(1);
+  return {
+    title: `Best ${label} Anime & Movies — Marquee`,
+    description: `Top-ranked ${genre} anime and movies, ranked and updated regularly.`,
+  };
+}
 
 type GenreRankingPageProps = {
   params: Promise<{ genre: string }>;

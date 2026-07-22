@@ -3,7 +3,9 @@
  *
  * Set DATABASE_URL in Vercel's Project Settings → Environment Variables.
  * Use whichever Postgres you provisioned (Neon, Supabase, RDS...) — just
- * make sure it's reachable from both Vercel and your EC2 instance.
+ * make sure it's reachable from Vercel and from wherever GitHub Actions
+ * runs the crawler scripts (both connect over the public internet, so no
+ * special networking is required).
  *
  * Neon/Supabase pooled connection strings already include `sslmode=require`;
  * `rejectUnauthorized: false` below keeps this working with their default
@@ -58,6 +60,23 @@ export async function getQueueJob(id: string): Promise<QueueJob | null> {
   return rows[0] ?? null;
 }
 
+// Resolved inline by app/api/queue/route.ts now (calls the HF Space
+// synchronously) instead of being drained once a day by the old EC2 batch
+// job — these just record the outcome for history/debugging.
+export async function markQueueJobDone(id: string, result: string): Promise<void> {
+  await getPool().query(
+    `update queue_jobs set status = 'done', result = $2, completed_at = now() where id = $1`,
+    [id, result]
+  );
+}
+
+export async function markQueueJobFailed(id: string, error: string): Promise<void> {
+  await getPool().query(
+    `update queue_jobs set status = 'failed', error = $2, completed_at = now() where id = $1`,
+    [id, error.slice(0, 500)]
+  );
+}
+
 /**
  * Autonomous content — read-only from the frontend's point of view.
  * Every row here was written by pipeline/generate_content.py once a day,
@@ -70,6 +89,10 @@ export interface BlogPostRow {
   title: string;
   meta_description: string;
   body: string[];
+  category: string | null;
+  tags: string[];
+  source_name: string | null;
+  source_url: string | null;
   likes: number;
   published_at: string;
 }
@@ -86,12 +109,21 @@ const BLOG_TRENDING_ORDER = `
 
 export async function getBlogPosts(
   limit = 100,
-  sort: "trending" | "recent" = "trending"
+  sort: "trending" | "recent" = "trending",
+  category?: string
 ): Promise<BlogPostRow[]> {
   const orderClause =
     sort === "trending" ? BLOG_TRENDING_ORDER : "order by published_at desc";
+  if (category) {
+    const { rows } = await getPool().query<BlogPostRow>(
+      `select slug, title, meta_description, body, category, tags, source_name, source_url, likes, published_at
+       from blog_posts where category = $1 ${orderClause} limit $2`,
+      [category, limit]
+    );
+    return rows;
+  }
   const { rows } = await getPool().query<BlogPostRow>(
-    `select slug, title, meta_description, body, likes, published_at
+    `select slug, title, meta_description, body, category, tags, source_name, source_url, likes, published_at
      from blog_posts ${orderClause} limit $1`,
     [limit]
   );
@@ -102,7 +134,7 @@ export async function getBlogPostBySlug(
   slug: string
 ): Promise<BlogPostRow | null> {
   const { rows } = await getPool().query<BlogPostRow>(
-    `select slug, title, meta_description, body, likes, published_at
+    `select slug, title, meta_description, body, category, tags, source_name, source_url, likes, published_at
      from blog_posts where slug = $1`,
     [slug]
   );
@@ -150,7 +182,7 @@ export async function getRankingBySlug(
 
 export interface QuizOption {
   text: string;
-  result: string;
+  correct: boolean;
 }
 
 export interface QuizQuestion {
@@ -158,8 +190,10 @@ export interface QuizQuestion {
   options: QuizOption[];
 }
 
-export interface QuizResult {
-  key: string;
+/** A score-based result tier, e.g. { minScore: 7, maxScore: 10, title: "Trivia Champion", ... }. */
+export interface QuizResultTier {
+  minScore: number;
+  maxScore: number;
   title: string;
   description: string;
 }
@@ -169,7 +203,7 @@ export interface QuizRow {
   title: string;
   description: string;
   questions: QuizQuestion[];
-  results: QuizResult[];
+  results: QuizResultTier[];
   likes: number;
   published_at: string;
 }

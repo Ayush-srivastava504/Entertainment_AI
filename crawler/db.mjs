@@ -34,6 +34,78 @@ export function sleep(ms) {
 }
 
 /**
+ * Upserts a batch of blog post rows from crawler/blog-crawler.mjs.
+ * Conflicts on BOTH slug and source_url: slug so a re-run never creates a
+ * duplicate route, source_url so the same story from the same feed is
+ * never imported twice even if its title (and therefore slug) changes
+ * slightly between fetches. Existing rows are refreshed (not skipped) so
+ * a story's summary/likes-safe fields stay current; `likes` is left alone.
+ */
+export async function upsertBlogPosts(rows) {
+  if (rows.length === 0) return 0;
+  const pool = getPool();
+  const client = await pool.connect();
+  let count = 0;
+  try {
+    await client.query("begin");
+    for (const r of rows) {
+      const res = await client.query(
+        `insert into blog_posts (slug, title, meta_description, body, category, tags, source_name, source_url, published_at)
+         values ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9)
+         on conflict (source_url) do update set
+           title = excluded.title, meta_description = excluded.meta_description, body = excluded.body,
+           category = excluded.category, tags = excluded.tags, source_name = excluded.source_name
+         where blog_posts.source_url is not null`,
+        [r.slug, r.title, r.meta_description, JSON.stringify(r.body), r.category, r.tags, r.source_name, r.source_url, r.published_at]
+      );
+      count += res.rowCount;
+    }
+    await client.query("commit");
+    return count;
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Upserts trivia quizzes from crawler/trivia-crawler.mjs. Each row is a
+ * full "deck" (one entertainment category = one quiz), so on conflict we
+ * refresh the question set in place rather than inserting duplicates —
+ * that also means re-running the crawler naturally rotates in fresh
+ * OpenTDB questions for the same slug over time.
+ */
+export async function upsertQuizzes(rows) {
+  if (rows.length === 0) return 0;
+  const pool = getPool();
+  const client = await pool.connect();
+  let count = 0;
+  try {
+    await client.query("begin");
+    for (const r of rows) {
+      const res = await client.query(
+        `insert into quizzes (slug, title, description, questions, results)
+         values ($1,$2,$3,$4::jsonb,$5::jsonb)
+         on conflict (slug) do update set
+           title = excluded.title, description = excluded.description,
+           questions = excluded.questions, results = excluded.results`,
+        [r.slug, r.title, r.description, JSON.stringify(r.questions), JSON.stringify(r.results)]
+      );
+      count += res.rowCount;
+    }
+    await client.query("commit");
+    return count;
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Upserts a batch of anime rows, regardless of which source produced them
  * (anilist / kitsu / jikan all normalize to this exact shape — see
  * crawler/sources/*.mjs). Shared by crawler/anime-sync.mjs and the

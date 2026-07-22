@@ -1,9 +1,11 @@
 -- Shared Postgres schema.
--- Vercel (Next.js) inserts rows and polls for results.
--- The EC2 batch pipeline drains "pending" rows once a day, then stops itself.
+-- Vercel (Next.js) inserts rows and reads results back in the same request
+-- (see lib/ai.ts + app/api/queue/route.ts — this calls the free Hugging
+-- Face Space in hf-space/ synchronously; there is no longer a separate
+-- daily batch job to wait on).
 --
 -- Run this once against whichever Postgres you provision (Neon / Supabase /
--- RDS — anything reachable from both Vercel and your EC2 instance's VPC).
+-- RDS / any reachable Postgres).
 
 create extension if not exists pgcrypto; -- for gen_random_uuid()
 
@@ -22,14 +24,14 @@ create index if not exists idx_queue_jobs_status on queue_jobs (status);
 create index if not exists idx_queue_jobs_created on queue_jobs (created_at desc);
 
 -- ---------------------------------------------------------------------
--- Autonomous content tables.
---
--- Nothing here is written by a user request. Once a day,
--- pipeline/generate_content.py loads the model, picks fresh topics from
--- its own internal list, generates a blog post + a ranking + a quiz, and
--- inserts them here already published — no queue row, no human review
--- step, no request/response round trip. The frontend just reads whatever
--- is newest.
+-- blog_posts is written to by one crawler now:
+--  crawler/blog-crawler.mjs (GitHub Actions, scheduled) — real trending
+--  news pulled from RSS feeds (movies/TV/anime/celebrities/gaming),
+--  extractively summarized (or abstractively, if AI_SUMMARY_ENDPOINT is
+--  set), always attributed via source_name/source_url.
+-- (The old EC2 pipeline used to also write LLM-invented "evergreen"
+-- posts here with no external grounding — that job has been removed;
+-- every row now traces back to a real source.)
 -- ---------------------------------------------------------------------
 
 create table if not exists blog_posts (
@@ -38,11 +40,29 @@ create table if not exists blog_posts (
   title             text not null,
   meta_description  text not null,
   body              jsonb not null,        -- array of paragraph strings
+  category          text,                   -- 'movies' | 'tv' | 'anime' | 'celebrities' | 'gaming' | null (evergreen pipeline posts)
+  tags              text[] not null default '{}',
+  source_name       text,                   -- e.g. "Variety" — null for pipeline-generated posts
+  source_url        text unique,            -- original article link; unique so re-crawling a feed never duplicates a story
   likes             integer not null default 0,
   published_at      timestamptz not null default now()
 );
 
+-- Additive, idempotent migration for pre-existing tables.
+alter table blog_posts add column if not exists category text;
+alter table blog_posts add column if not exists tags text[] not null default '{}';
+alter table blog_posts add column if not exists source_name text;
+alter table blog_posts add column if not exists source_url text;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'blog_posts_source_url_key') then
+    alter table blog_posts add constraint blog_posts_source_url_key unique (source_url);
+  end if;
+end $$;
+
 create index if not exists idx_blog_posts_published on blog_posts (published_at desc);
+create index if not exists idx_blog_posts_category on blog_posts (category, published_at desc);
+create index if not exists idx_blog_posts_tags on blog_posts using gin (tags);
 
 create table if not exists rankings (
   id                uuid primary key default gen_random_uuid(),
@@ -57,13 +77,20 @@ create table if not exists rankings (
 
 create index if not exists idx_rankings_category on rankings (category, published_at desc);
 
+-- Trivia quizzes — populated by crawler/trivia-crawler.mjs (source:
+-- OpenTDB, free/keyless), on a schedule (see .github/workflows/sync.yml).
+-- This replaced the old EC2 pipeline's LLM-generated "personality quiz"
+-- format entirely: every question now has one real correct answer instead
+-- of mapping to a personality-type key.
+--   questions: [{ text, options: [{ text, correct: boolean }] }]
+--   results:   [{ minScore, maxScore, title, description }]  -- score tiers
 create table if not exists quizzes (
   id                uuid primary key default gen_random_uuid(),
   slug              text unique not null,
   title             text not null,
   description       text not null,
-  questions         jsonb not null,  -- [{ text, options: [{ text, result }] }]
-  results           jsonb not null,  -- [{ key, title, description }]
+  questions         jsonb not null,
+  results           jsonb not null,
   likes             integer not null default 0,
   published_at      timestamptz not null default now()
 );

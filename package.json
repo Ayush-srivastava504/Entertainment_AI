@@ -13,15 +13,18 @@
     "crawl:anime:jikan-only": "node crawler/jikan-crawler.mjs",
     "crawl:movies": "node crawler/tmdb-crawler.mjs",
     "crawl:movies:full": "node crawler/tmdb-crawler.mjs --full",
-    "crawl:all": "npm run crawl:anime && npm run crawl:movies",
-    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full"
+    "crawl:blog": "node crawler/blog-crawler.mjs",
+    "crawl:trivia": "node crawler/trivia-crawler.mjs",
+    "crawl:all": "npm run crawl:anime && npm run crawl:movies && npm run crawl:blog && npm run crawl:trivia",
+    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full && npm run crawl:blog && npm run crawl:trivia"
   },
 
   "dependencies": {
     "next": "16.2.10",
     "pg": "^8.12.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",

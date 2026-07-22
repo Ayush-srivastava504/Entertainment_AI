@@ -3,7 +3,6 @@ export type Task =
   | "anime-find"
   | "tag-generate"
   | "story-generate"
-  | "quiz-generate"
   | "thumbnail-feedback";
 
 /**
@@ -50,14 +49,6 @@ export function buildPrompt(task: Task, input: Record<string, string>): string {
         `${input.length} words long. Main character: ${input.character}.`,
         `Ending style: ${input.ending}.`,
         "Write only the story — no title, no author notes, no commentary.",
-      ].join("\n");
-
-    case "quiz-generate":
-      return [
-        `Write a single quiz question for a "${input.quizTitle}" personality`,
-        "quiz. Provide the question and exactly 4 answer options labeled",
-        "A-D, one per line, no extra commentary. Each option should map to a",
-        "different result/personality type.",
       ].join("\n");
 
     case "thumbnail-feedback":

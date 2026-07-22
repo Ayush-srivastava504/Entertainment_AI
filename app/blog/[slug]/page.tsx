@@ -43,6 +43,14 @@ export default async function BlogPostPage({
       <div className="mb-8">
         <LikeButton type="blog" slug={post.slug} initialLikes={post.likes} />
       </div>
+      {post.source_name && post.source_url && (
+        <p className="mb-6 text-sm text-marquee-textDim">
+          Original story via{" "}
+          <a href={post.source_url} target="_blank" rel="noopener noreferrer" className="text-marquee-gold hover:underline">
+            {post.source_name}
+          </a>
+        </p>
+      )}
       <div className="space-y-4 text-marquee-text leading-relaxed">
         {post.body.map((para, i) => (
           <p key={i}>{para}</p>

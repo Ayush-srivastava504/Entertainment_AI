@@ -1,96 +1,115 @@
-# Marquee — AI Entertainment Platform (starter)
+# Marquee — AI Entertainment Platform
 
-Next.js 14 (App Router, TypeScript, Tailwind) frontend, deployed on Vercel.
-There is **no live model call in the request path**. Instead:
+Next.js (App Router, TypeScript, Tailwind) frontend, deployed on Vercel.
+Postgres is the single source of truth for everything the frontend reads —
+nothing calls a third-party API (TMDB, AniList, OpenTDB, RSS feeds) at
+request time.
 
 ```
-User submits a tool  →  Vercel writes a row to Postgres (status: pending)
-                      →  page shows "queued", remembers the job id locally
-                      →  once a day, an EC2 t2.micro spins up, loads Qwen,
-                         drains every pending row, writes results back,
-                         then stops itself
-                      →  next time the user opens that page, ToolShell
-                         polls the job id and shows the result
+Scheduled crawlers (GitHub Actions)  →  write rows into Postgres
+On-demand AI tools (movie/anime      →  Vercel API route calls the
+  recommender, tag generator, etc.)     hf-space/ model directly and
+                                         returns the result in the same
+                                         request (see lib/ai.ts)
+Every page                            →  reads Postgres, nothing else
 ```
 
-This trades instant answers for near-zero compute cost: the model only
-runs for a few minutes once a day instead of sitting idle waiting for
-requests (which is what both the free HF Inference API and an always-on
-HF Space or Render service do).
+There is no EC2 instance and no daily batch job anymore. Content that used
+to be generated once a day by an EC2 box now comes from real scheduled
+crawlers, and on-demand tool requests are answered synchronously by a free
+Hugging Face Space instead of being queued for a batch run.
 
 ```
 entertainment-ai/
 ├── app/
-│   ├── page.tsx                     # homepage
-│   ├── movies/page.tsx              # 🎬 movie recommender
-│   ├── anime/page.tsx               # 🍥 anime finder
-│   ├── stories/page.tsx             # 📖 story generator
-│   ├── quiz/page.tsx                # 🧠 quiz question generator
-│   ├── tools/tag-generator/page.tsx # 🏷 tag generator
-│   ├── tools/thumbnail-rating/page.tsx # 🖼 thumbnail rating
-│   └── api/queue/                   # POST to queue a job, GET to poll it
+│   ├── page.tsx                         # homepage
+│   ├── movies/, anime/, rankings/       # catalog pages, DB-backed
+│   ├── blog/                            # real news, crawled from RSS
+│   ├── quizzes/                         # trivia quizzes, crawled from OpenTDB
+│   ├── tools/tag-generator/page.tsx     # 🏷 tag generator (on-demand AI)
+│   ├── tools/thumbnail-rating/page.tsx  # 🖼 thumbnail rating (on-demand AI)
+│   └── api/queue/                       # POST to run an on-demand AI tool
 ├── components/
 │   ├── Nav.tsx / Footer.tsx
-│   └── ToolShell.tsx                # shared form + queued/result UI
+│   ├── QuizPlayer.tsx                   # trivia quiz UI (scoring, tiers)
+│   └── ToolShell.tsx                    # shared form + result UI for AI tools
 ├── lib/
-│   ├── db.ts                        # Postgres client (server-only)
-│   └── prompts.ts                   # one prompt template per tool
-├── db/schema.sql                    # queue_jobs table
-└── pipeline/                        # the EC2 batch job — see pipeline/README.md
+│   ├── db.ts                            # Postgres client (server-only)
+│   ├── ai.ts                            # calls the hf-space/ generator (server-only)
+│   └── prompts.ts                       # one prompt template per AI tool
+├── crawler/                              # scheduled crawlers (GitHub Actions)
+│   ├── tmdb-crawler.mjs                 # movies
+│   ├── anime-sync.mjs / jikan-crawler.mjs / sources/  # anime
+│   ├── blog-crawler.mjs                 # real news via RSS
+│   └── trivia-crawler.mjs               # trivia quizzes via OpenTDB
+├── db/schema.sql
+└── hf-space/                             # free Hugging Face Space serving the model
 ```
-
-> Superseded: `hf-space/` (a HF Space serving the model live) is no longer
-> used by this setup — it's left in the repo in case you ever want to go
-> back to live generation instead of the batch queue. The active backend
-> is `pipeline/`.
 
 ## 1. Run the frontend locally
 
 ```bash
 npm install
 cp .env.example .env.local
-# set DATABASE_URL — see "Set up the backend" below
+# set DATABASE_URL at minimum — see "Set up the backend" below
 npm run dev
 # → http://localhost:3000
 ```
 
-Locally, tools will queue jobs into whatever Postgres `DATABASE_URL` points
-at. Nothing processes them until the pipeline runs (either your own EC2 box,
-or run `pipeline/process_queue.py` on your own machine against the same DB
-while testing).
+Catalog/blog/quiz pages need Postgres populated by the crawlers (step 2) to
+show anything. The on-demand AI tools (tag generator, thumbnail rating)
+need `HF_SPACE_URL` set (step 3) to return a result.
 
-## 2. Set up the backend (Postgres + EC2 batch pipeline)
+## 2. Set up the backend (Postgres + crawlers)
 
-Full step-by-step: **[`pipeline/README.md`](./pipeline/README.md)**.
-
-Short version:
 1. Create a free Postgres (Neon or Supabase), run `db/schema.sql` against it.
-2. Launch a `t2.micro`, install the pipeline, and make it stop itself after
-   each run (IAM role + `run.sh`).
-3. Schedule a daily start via EventBridge Scheduler.
-4. Put the same `DATABASE_URL` in Vercel's env vars.
+2. Put `DATABASE_URL` in Vercel's env vars **and** as a GitHub Actions
+   secret (Settings → Secrets and variables → Actions) for the same repo —
+   `.github/workflows/sync.yml` runs the crawlers on a schedule using it.
+3. Get a free `TMDB_API_READ_ACCESS_TOKEN` and add it as a GitHub secret too.
+4. Run `npm run crawl:all:full` once locally (or trigger the workflow
+   manually) to do the first full catalog load.
 
-## 3. Deploy the frontend to Vercel
+## 3. Deploy the on-demand AI tools (optional)
+
+The tag generator and thumbnail-rating tools call a small model hosted on
+a free Hugging Face Space:
+
+1. Create a Space at huggingface.co (SDK = Docker), push the contents of
+   `hf-space/` to it. See `hf-space/README.md`.
+2. Set `HF_SPACE_URL` in Vercel's env vars to that Space's `/generate`
+   endpoint. If you made the Space private, also set `HF_TOKEN`.
+
+If you skip this, every other part of the site (catalog, blog, quizzes)
+still works — only the two AI tool pages will show an error.
+
+## 4. Deploy the frontend to Vercel
 
 ```bash
 npm i -g vercel
 vercel
 ```
-Add `DATABASE_URL` in Project Settings → Environment Variables — it's the
-only one the frontend needs now.
+Add `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `REVALIDATION_SECRET`, and
+(optionally) `HF_SPACE_URL`/`HF_TOKEN` in Project Settings → Environment
+Variables.
 
-**Custom domain:** Project Settings → Domains → add your domain, then point
-its DNS at Vercel (usually a CNAME to `cname.vercel-dns.com` or the A record
-Vercel gives you). Buy the domain anywhere (Cloudflare Registrar, Namecheap,
-Porkbun, etc.) — Vercel doesn't require you to buy it from them.
+## 5. Attach a custom domain
 
-## 4. Add more tools
+See **[`DOMAIN_SETUP.md`](./DOMAIN_SETUP.md)** — in short: add the domain
+in Vercel, point its DNS at Vercel, then update one environment variable
+(`NEXT_PUBLIC_SITE_URL`). Nothing else in the code needs to change.
+
+## 6. Security
+
+See **[`SECURITY.md`](./SECURITY.md)** for what's already locked down
+(parameterized queries, security headers, rate limiting, secret handling)
+and what to double check before going live.
+
+## 7. Add more on-demand AI tools
 
 Every tool follows the same shape:
-1. Add a case to `buildPrompt()` in `lib/prompts.ts` **and** the matching
-   branch in `pipeline/prompts.py` (they must stay in sync — the frontend
-   builds the job, the pipeline builds the prompt it actually runs).
+1. Add a case to `buildPrompt()` in `lib/prompts.ts`.
 2. Add the task name to `VALID_TASKS` in `app/api/queue/route.ts`.
 3. Add a page that renders `<ToolShell task="..." buildInput={...} />`.
 
-No new backend, no new model — same one model, one more prompt, same queue.
+No new backend, no new model — same `hf-space/` model, one more prompt.

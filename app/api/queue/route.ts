@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createQueueJob } from "@/lib/db";
-import { Task } from "@/lib/prompts";
+import { createQueueJob, markQueueJobDone, markQueueJobFailed } from "@/lib/db";
+import { buildPrompt, Task } from "@/lib/prompts";
+import { generateWithAI, AiUnavailableError } from "@/lib/ai";
 
 export const runtime = "nodejs";
 
@@ -9,13 +10,12 @@ const VALID_TASKS: Task[] = [
   "anime-find",
   "tag-generate",
   "story-generate",
-  "quiz-generate",
   "thumbnail-feedback",
 ];
 
-// Small in-memory rate limit per server instance — same as the old
-// /api/generate route had. Fine for a starter; swap for Upstash/Redis if
-// you need it to hold across serverless instances.
+// Small in-memory rate limit per server instance. Fine for a starter;
+// swap for Upstash/Redis if you need it to hold across serverless
+// instances or behind multiple regions.
 const hits = new Map<string, number[]>();
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 12;
@@ -26,6 +26,19 @@ function rateLimited(key: string): boolean {
   arr.push(now);
   hits.set(key, arr);
   return arr.length > MAX_PER_WINDOW;
+}
+
+// A hard cap on any single input field so nobody can queue a multi-MB
+// prompt (protects both Postgres and the HF Space request body size).
+const MAX_FIELD_LENGTH = 2000;
+
+function validateInput(input: unknown): input is Record<string, string> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return false;
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (typeof key !== "string" || key.length > 100) return false;
+    if (typeof value !== "string" || value.length > MAX_FIELD_LENGTH) return false;
+  }
+  return true;
 }
 
 export async function POST(req: NextRequest) {
@@ -44,8 +57,11 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (!input || typeof input !== "object") {
-    return NextResponse.json({ error: "Missing input object." }, { status: 400 });
+  if (!validateInput(input)) {
+    return NextResponse.json(
+      { error: "Missing or invalid input object (each field must be a string, max 2000 chars)." },
+      { status: 400 }
+    );
   }
 
   const ip = req.headers.get("x-forwarded-for") ?? "local";
@@ -56,14 +72,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // We still keep a queue_jobs row (useful history/audit trail + the
+  // existing polling UI keeps working), but it's resolved inline in this
+  // same request now instead of waiting for a daily EC2 batch job.
+  let jobId: string;
   try {
-    const job = await createQueueJob(task, input);
-    return NextResponse.json({ id: job.id, status: job.status });
+    const job = await createQueueJob(task as Task, input);
+    jobId = job.id;
   } catch (err) {
     console.error("queue insert error:", err);
     return NextResponse.json(
       { error: "Could not queue this request. Try again shortly." },
       { status: 502 }
     );
+  }
+
+  try {
+    const prompt = buildPrompt(task as Task, input);
+    const result = await generateWithAI(prompt);
+    await markQueueJobDone(jobId, result);
+    return NextResponse.json({ id: jobId, status: "done", result });
+  } catch (err) {
+    const message =
+      err instanceof AiUnavailableError
+        ? err.message
+        : "Generation failed. Try again shortly.";
+    await markQueueJobFailed(jobId, message);
+    return NextResponse.json({ id: jobId, status: "failed", error: message }, { status: 502 });
   }
 }
