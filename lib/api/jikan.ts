@@ -1,64 +1,114 @@
 import { normalizeAnime, type MediaItem } from "@/lib/api/normalize";
 
-const JIKAN_BASE = "https://api.jikan.moe/v4";
+const BASE = "https://api.jikan.moe/v4";
 
 async function fetchJikan(path: string) {
-  const res = await fetch(`${JIKAN_BASE}${path}`, { next: { revalidate: 3600 } });
+  const res = await fetch(`${BASE}${path}`, {
+    next: { revalidate: 3600 },
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
   if (!res.ok) {
-    throw new Error(`Jikan request failed: ${res.status}`);
+    throw new Error(`Jikan ${res.status}: ${await res.text()}`);
   }
+
   return res.json();
 }
 
-const fallbackAnime: MediaItem[] = [
-  { id: "1", kind: "anime", title: "Attack on Titan", description: "A tense, high-stakes anime about survival and rebellion.", posterUrl: "https://images.unsplash.com/photo-1517602302552-471fe67acf66?auto=format&fit=crop&w=500&q=80", year: 2013, score: 8.8, genres: ["Action", "Drama"], source: "jikan" },
-  { id: "2", kind: "anime", title: "Spy x Family", description: "A warm and witty family comedy packed with spy intrigue.", posterUrl: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=500&q=80", year: 2022, score: 8.4, genres: ["Comedy", "Action"], source: "jikan" },
-  { id: "3", kind: "anime", title: "Fullmetal Alchemist: Brotherhood", description: "A legendary adventure of alchemy, brotherhood, and sacrifice.", posterUrl: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=500&q=80", year: 2009, score: 9.1, genres: ["Adventure", "Fantasy"], source: "jikan" },
-];
+async function load(path: string, limit = 12): Promise<MediaItem[]> {
+  const json = await fetchJikan(path);
 
-async function readAnimeList(path: string, fallback: MediaItem[] = fallbackAnime): Promise<MediaItem[]> {
+  if (!Array.isArray(json.data)) {
+    return [];
+  }
+
+  return json.data
+    .map(normalizeAnime)
+    .slice(0, limit);
+}
+
+export async function getAnimeSection(
+  section:
+    | "trending"
+    | "popular"
+    | "top-rated"
+    | "upcoming"
+    | "search",
+  query = "",
+  page = 1,
+  limit = 12
+): Promise<MediaItem[]> {
   try {
-    const data = await fetchJikan(path);
-    const items = Array.isArray(data?.data) ? data.data : [];
-    return items.map((item: any) => normalizeAnime(item)).slice(0, 12);
-  } catch {
-    return fallback;
+    switch (section) {
+      case "search":
+        if (!query) return [];
+        return load(
+          `/anime?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+          limit
+        );
+
+      case "upcoming":
+        return load(
+          `/seasons/upcoming?page=${page}&limit=${limit}`,
+          limit
+        );
+
+      case "popular":
+        return load(
+          `/top/anime?filter=bypopularity&page=${page}&limit=${limit}`,
+          limit
+        );
+
+      case "top-rated":
+        return load(
+          `/top/anime?page=${page}&limit=${limit}`,
+          limit
+        );
+
+      case "trending":
+      default:
+        return load(
+          `/seasons/now?page=${page}&limit=${limit}`,
+          limit
+        );
+    }
+  } catch (err) {
+    console.error("Jikan Error:", err);
+    return [];
   }
 }
 
-export async function getAnimeSection(section: "trending" | "popular" | "top-rated" | "upcoming" | "search", query = "", page = 1, limit = 12): Promise<MediaItem[]> {
-  if (section === "search") {
-    if (!query) return fallbackAnime.slice(0, limit);
-    return readAnimeList(`/anime?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`);
-  }
-  if (section === "upcoming") {
-    return readAnimeList(`/seasons/upcoming?page=${page}&limit=${limit}`);
-  }
-  return readAnimeList(`/top/anime?page=${page}&limit=${limit}`);
-}
-
-export async function getAnimeById(id: string): Promise<MediaItem | null> {
+export async function getAnimeById(id: string) {
   try {
-    const data = await fetchJikan(`/anime/${id}/full`);
-    return normalizeAnime(data?.data ?? null);
-  } catch {
-    return fallbackAnime.find((item) => item.id === id) ?? fallbackAnime[0] ?? null;
+    const json = await fetchJikan(`/anime/${id}/full`);
+    return normalizeAnime(json.data);
+  } catch (err) {
+    console.error(err);
+    return null;
   }
 }
 
-export async function getAnimeRankings(page = 1, limit = 100): Promise<MediaItem[]> {
-  try {
-    const data = await fetchJikan(`/top/anime?page=${page}&limit=${limit}`);
-    const items = Array.isArray(data?.data) ? data.data : [];
-    return items.map((item: any) => normalizeAnime(item));
-  } catch {
-    return fallbackAnime.slice(0, limit);
-  }
+export async function getAnimeRankings(
+  page = 1,
+  limit = 100
+) {
+  return load(`/top/anime?page=${page}&limit=${limit}`, limit);
 }
 
-export async function getAnimeByGenre(genre: string, page = 1, limit = 12): Promise<MediaItem[]> {
-  const items = await getAnimeRankings(page, 24);
-  const target = genre.toLowerCase();
-  const filtered = items.filter((item) => item.genres.some((name) => name.toLowerCase().includes(target)));
-  return filtered.slice(0, limit);
+export async function getAnimeByGenre(
+  genre: string,
+  page = 1,
+  limit = 12
+) {
+  const all = await getAnimeRankings(page, 100);
+
+  return all
+    .filter((a) =>
+      a.genres.some((g) =>
+        g.toLowerCase().includes(genre.toLowerCase())
+      )
+    )
+    .slice(0, limit);
 }
