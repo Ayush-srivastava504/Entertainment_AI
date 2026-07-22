@@ -101,8 +101,13 @@ create index if not exists idx_comments_lookup on comments (content_type, conten
 
 create extension if not exists pg_trgm; -- fast ILIKE search on title
 
+-- id is a MyAnimeList id whenever any source can supply one (Jikan always
+-- can; AniList via idMal; Kitsu via its mappings include) — this is what
+-- keeps AniList/Kitsu/Jikan writing to the SAME row for the same anime
+-- instead of creating duplicates. Only anime with no MAL mapping at all
+-- get a synthetic "al-<id>" / "ki-<id>" id. See crawler/sources/*.mjs.
 create table if not exists anime (
-  id             text primary key,        -- Jikan mal_id
+  id             text primary key,        -- MyAnimeList id when known, else "al-"/"ki-" prefixed
   title          text not null,
   title_english  text,
   synopsis       text,
@@ -110,7 +115,7 @@ create table if not exists anime (
   trailer_url    text,
   year           integer,
   score          numeric,
-  popularity     integer,                 -- lower = more popular (Jikan convention)
+  popularity     integer,                 -- lower = more popular (Jikan convention — all sources normalize to this)
   rank           integer,
   episodes       integer,
   status         text,                    -- 'Currently Airing' | 'Finished Airing' | 'Not yet aired'
@@ -119,9 +124,15 @@ create table if not exists anime (
   studios        text[] not null default '{}',
   aired_from     date,
   aired_to       date,
-  raw            jsonb not null,          -- full Jikan payload, for future fields without a migration
+  raw            jsonb not null,          -- full upstream payload, for future fields without a migration
+  source         text not null default 'jikan', -- 'anilist' | 'kitsu' | 'jikan' — which API last wrote this row
   updated_at     timestamptz not null default now()
 );
+
+-- Additive, idempotent migration for tables created before the AniList/
+-- Kitsu fallback chain existed (create table if not exists won't add new
+-- columns to an already-existing table).
+alter table anime add column if not exists source text not null default 'jikan';
 
 create index if not exists idx_anime_score on anime (score desc nulls last);
 create index if not exists idx_anime_popularity on anime (popularity asc nulls last);
@@ -129,6 +140,7 @@ create index if not exists idx_anime_year on anime (year desc nulls last);
 create index if not exists idx_anime_status on anime (status);
 create index if not exists idx_anime_genres on anime using gin (genres);
 create index if not exists idx_anime_title_trgm on anime using gin (title gin_trgm_ops);
+create index if not exists idx_anime_source on anime (source);
 
 -- ---------------------------------------------------------------------
 -- Movie catalog — populated by crawler/tmdb-crawler.mjs (source:
@@ -188,11 +200,14 @@ create index if not exists idx_movies_title_trgm on movies using gin (title gin_
 -- ---------------------------------------------------------------------
 
 create table if not exists sync_state (
-  source              text primary key,   -- 'jikan' | 'yts'
+  source              text primary key,   -- 'anime' | 'movies' | ...
   last_run_at         timestamptz,
   last_full_sync_at   timestamptz,
   last_pages_crawled  integer,
-  last_rows_upserted  integer
+  last_rows_upserted  integer,
+  details             jsonb                -- per-upstream-source breakdown, e.g. {"anilist":{"pages":20,"rows":500},...}
 );
+
+alter table sync_state add column if not exists details jsonb;
 
 

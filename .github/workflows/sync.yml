@@ -41,7 +41,7 @@ jobs:
             echo "full=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Crawl anime (Jikan)
+      - name: Crawl anime (AniList -> Kitsu -> Jikan)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run ${{ steps.mode.outputs.full == 'true' && 'crawl:anime:full' || 'crawl:anime' }}

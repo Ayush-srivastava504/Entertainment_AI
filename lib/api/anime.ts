@@ -1,10 +1,12 @@
 /**
- * Anime reads — Postgres only. Never calls Jikan directly.
+ * Anime reads — Postgres only. Never calls AniList/Kitsu/Jikan directly.
  *
- * Jikan is fetched exclusively by crawler/jikan-crawler.mjs on a schedule
- * (see .github/workflows/sync.yml) and upserted into the `anime` table.
- * This keeps request latency independent of Jikan's rate limits and
- * uptime, and lets every section below run as a fast, indexed SQL query.
+ * The `anime` table is populated exclusively by crawler/anime-sync.mjs on
+ * a schedule (see .github/workflows/sync.yml), which tries AniList first,
+ * falls back to Kitsu, and falls back to Jikan last (crawler/sources/*.mjs).
+ * This keeps request latency independent of any single upstream API's
+ * rate limits and uptime, and lets every section below run as a fast,
+ * indexed SQL query.
  */
 import { getPool } from "@/lib/db";
 import { cached } from "@/lib/cache";
@@ -25,7 +27,7 @@ function rowToMedia(row: any): MediaItem {
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
     genres: row.genres ?? [],
-    source: "jikan",
+    source: row.source ?? "jikan",
   };
 }
 
