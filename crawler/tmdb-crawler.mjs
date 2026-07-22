@@ -1,29 +1,17 @@
-/**
- * Fetches movies from TMDB (The Movie Database) — api.themoviedb.org — and
- * upserts into the `movies` table. Requires a free TMDB_API_READ_ACCESS_TOKEN
- * (the v4 "Read Access Token", a long JWT-looking string, NOT the shorter
- * v3 API key): https://www.themoviedb.org/settings/api → copy "API Read
- * Access Token". Self-serve signup, no approval wait.
- *
- * TMDB also hosts poster/backdrop images directly, so unlike the old Trakt
- * setup there's no separate poster-backfill step — posters and backdrops
- * are populated in this same pass.
- *
- * Run every 6h (incremental) via GitHub Actions, plus a deeper weekly
- * full sync — see .github/workflows/sync.yml.
- *
- *   TMDB_API_READ_ACCESS_TOKEN=xxx node crawler/tmdb-crawler.mjs             # incremental (~5 pages/list)
- *   TMDB_API_READ_ACCESS_TOKEN=xxx node crawler/tmdb-crawler.mjs --full      # full (~20 pages/list)
- *   TMDB_API_READ_ACCESS_TOKEN=xxx node crawler/tmdb-crawler.mjs --pages=10  # explicit override
- *   TMDB_API_READ_ACCESS_TOKEN=xxx node crawler/tmdb-crawler.mjs --no-details # skip per-movie detail enrichment (faster)
- */
+/*
+This module crawls movie data from TMDB (The Movie Database) API and upserts
+it into the movies table. It fetches from multiple lists (trending, popular,
+upcoming, top_rated) and optionally enriches each movie with details like
+trailers, runtime, and external IDs.
+*/
+
 import { getPool, recordSync, sleep } from "./db.mjs";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
 const TOKEN = process.env.TMDB_API_READ_ACCESS_TOKEN;
 const REQUEST_DELAY_MS = 250;
-const PAGE_SIZE = 20; // fixed by TMDB
+const PAGE_SIZE = 20;
 
 const args = process.argv.slice(2);
 const isFull = args.includes("--full");
@@ -31,10 +19,6 @@ const withDetails = !args.includes("--no-details");
 const pagesArg = args.find((a) => a.startsWith("--pages="));
 const PAGES = pagesArg ? Number(pagesArg.split("=")[1]) : isFull ? 20 : 5;
 
-// list = TMDB endpoint, statKey = which column this list's ordering feeds
-// (TMDB has no exact equivalent of Trakt's watchers/plays/list_count, so
-// we map its closest popularity/demand signals onto those same columns —
-// this keeps the `movies` table schema and lib/api/movies.ts unchanged).
 const LISTS = [
   { path: "trending/movie/week", statKey: "watchers" },
   { path: "movie/popular", statKey: "plays" },
@@ -141,8 +125,6 @@ async function upsertBatch(rows) {
            trailer_url = coalesce(excluded.trailer_url, movies.trailer_url),
            year = excluded.year, score = excluded.score,
            runtime = coalesce(excluded.runtime, movies.runtime), genres = excluded.genres, language = excluded.language,
-           -- stats only come from one list at a time; don't let a pass that lacks a
-           -- given stat (e.g. /top_rated has no assigned stat) null out a value another pass set
            watchers = coalesce(excluded.watchers, movies.watchers),
            plays = coalesce(excluded.plays, movies.plays),
            list_count = coalesce(excluded.list_count, movies.list_count),
@@ -178,7 +160,7 @@ async function main() {
   );
 
   const genreMap = await fetchGenreMap();
-  const detailCache = new Map(); // tmdb id -> detail payload, avoids re-fetching movies shared across lists
+  const detailCache = new Map();
   let totalUpserted = 0;
 
   for (const list of LISTS) {
@@ -211,7 +193,7 @@ async function main() {
       totalUpserted += count;
       console.log(`  [${list.path}] page ${page}/${PAGES}: upserted ${count} (total ${totalUpserted})`);
 
-      if (results.length < PAGE_SIZE || page >= (data?.total_pages ?? Infinity)) break; // last page
+      if (results.length < PAGE_SIZE || page >= (data?.total_pages ?? Infinity)) break;
     }
   }
 

@@ -1,16 +1,8 @@
-/**
- * Thin wrapper around gtag.js so components never touch `window` directly
- * or need to guard against gtag not being loaded yet (ad blockers, SSR,
- * the script tag not having executed yet on a fast click, etc).
- *
- * Usage: trackEvent("like_content", { content_type: "quiz", slug });
- *
- * Event names loosely follow GA4's recommended-event conventions where one
- * exists (search, select_content...) and use plain custom names otherwise.
- * These show up in GA4 under Admin -> Events, and can be marked as "key
- * events" (formerly "conversions") there once they start recording —
- * nothing else needs to change on the code side to promote one.
- */
+/*
+This module provides a thin wrapper around gtag.js for analytics tracking.
+It safely handles server-side rendering and cases where gtag is not loaded,
+allowing components to track events without directly accessing window.
+*/
 
 declare global {
   interface Window {

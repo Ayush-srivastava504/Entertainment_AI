@@ -1,14 +1,8 @@
-/**
- * Tiny in-memory TTL cache in front of Postgres reads.
- *
- * Serverless functions reuse warm instances between requests, so this
- * still cuts a meaningful amount of DB load even without an external
- * cache — and it means the app has zero extra infra to provision.
- *
- * Want real cross-instance caching (Redis/Upstash)? Swap the body of
- * `cached()` for a GET/SET against your Redis client — every call site
- * in lib/api/anime.ts and lib/api/movies.ts stays the same.
- */
+/*
+This module provides a simple in-memory TTL cache for Postgres read operations.
+It reduces database load in serverless environments by caching query results
+across requests, with a maximum entry limit to prevent memory leaks.
+*/
 
 interface Entry<T> {
   value: T;
@@ -17,7 +11,6 @@ interface Entry<T> {
 
 const store = new Map<string, Entry<unknown>>();
 
-// Keep the process from leaking memory if it stays warm a long time.
 const MAX_ENTRIES = 2000;
 
 export async function cached<T>(

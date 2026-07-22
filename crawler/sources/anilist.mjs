@@ -1,26 +1,15 @@
-/**
- * AniList GraphQL API — PRIMARY anime source.
- *
- * Free, keyless, no rate-limit key required. AniList's public rate limit
- * has fluctuated (historically 90 req/min, currently throttled lower by
- * AniList themselves) — we stay conservative and always honor the
- * Retry-After header on 429s.
- *
- * Row shape matches crawler/anime-sync.mjs's expectations exactly, so it
- * can upsert rows from any source through the same code path.
- *
- * Cross-source ID continuity: AniList exposes `idMal`, the same MyAnimeList
- * ID that Jikan has always used as the anime table's primary key. When
- * present, we reuse it as `id` so records upsert into the SAME row Jikan
- * would have created — no duplicate rows, no broken /anime/[slug] URLs,
- * no sitemap churn. Only titles AniList knows about that have no MAL
- * mapping get a synthetic `al-<id>` id.
- */
+/*
+This module fetches anime data from the AniList GraphQL API, normalizing
+it into the application's database schema. It handles rate limiting,
+retries, and ID mapping to ensure continuity with existing data from
+other sources like Jikan.
+*/
+
 import { withRetry, RetryableError, SourcePageError } from "../lib/retry.mjs";
 
 export const SOURCE = "anilist";
 export const PAGE_SIZE = 25;
-export const REQUEST_DELAY_MS = 1500; // conservative — AniList throttles aggressively
+export const REQUEST_DELAY_MS = 1500;
 
 const ENDPOINT = "https://graphql.anilist.co";
 
@@ -77,13 +66,6 @@ function stripHtml(s) {
   return s ? s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : null;
 }
 
-// `rankOffset` gives every row in this page a running popularity RANK
-// (1 = most popular), matching the "lower = more popular" convention the
-// existing `anime` table and all its queries (order by popularity asc)
-// already use. We deliberately do NOT store AniList's raw `popularity`
-// count here — it's a list-count (higher = more popular), the opposite
-// convention, and mixing the two would silently corrupt every popularity
-// sort. The raw count is preserved in `raw` for anyone who wants it later.
 function toRow(m, rank) {
   const id = m.idMal ? String(m.idMal) : `al-${m.id}`;
   return {
@@ -130,19 +112,12 @@ async function rawFetchPage(page, pageSize) {
   const json = await res.json();
   if (json.errors?.length) {
     const msg = json.errors.map((e) => e.message).join("; ");
-    // AniList surfaces rate limiting as a GraphQL error too, not just HTTP 429.
     if (/rate limit/i.test(msg)) throw new RetryableError(`AniList rate limited: ${msg}`);
     throw new Error(`AniList GraphQL error: ${msg}`);
   }
   return json.data.Page;
 }
 
-/**
- * Fetches one page of AniList media and normalizes it.
- * @param {number} page 1-indexed page number
- * @param {{startRank: number}} opts running popularity-rank counter
- * @returns {{rows: object[], hasNextPage: boolean}}
- */
 export async function fetchPage(page, { startRank = 1 } = {}) {
   try {
     const data = await withRetry(() => rawFetchPage(page, PAGE_SIZE), {

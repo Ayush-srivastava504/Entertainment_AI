@@ -1,14 +1,9 @@
-/**
- * Server-only call to an external AI text-generation endpoint. Optional —
- * if HF_SPACE_URL isn't set (it currently isn't; this app runs on Vercel
- * only, nothing else deployed), the on-demand AI tools just return a
- * friendly "unavailable" error and every other part of the site works
- * as normal.
- *
- * NEVER import this from a client component — HF_SPACE_URL/HF_TOKEN must
- * stay server-side. All callers of buildPrompt/generateWithAI live under
- * app/api/**\/route.ts, which only ever run on the server.
- */
+/*
+This module provides a server-side function to call an external AI text-generation
+endpoint. It includes timeout handling, error management, and environment-based
+configuration. This code must only run on the server and is used by API routes
+for on-demand AI tools.
+*/
 
 const DEFAULT_TIMEOUT_MS = 25_000;
 
@@ -32,7 +27,6 @@ export async function generateWithAI(
 
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    // Only needed if the AI endpoint requires auth.
     if (process.env.HF_TOKEN) {
       headers.Authorization = `Bearer ${process.env.HF_TOKEN}`;
     }

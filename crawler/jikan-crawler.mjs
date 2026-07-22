@@ -1,16 +1,9 @@
-/**
- * Standalone manual/debug entry point for the Jikan source only.
- *
- * The scheduled crawl (.github/workflows/sync.yml, `npm run crawl:anime`)
- * uses crawler/anime-sync.mjs instead, which tries AniList first, then
- * Kitsu, and only falls back to this source last. Run this file directly
- * if you specifically want to force a Jikan-only crawl (e.g. to debug
- * Jikan itself, or backfill via it on purpose):
- *
- *   node crawler/jikan-crawler.mjs                 # incremental (~25 pages)
- *   node crawler/jikan-crawler.mjs --full          # full (~90 pages)
- *   node crawler/jikan-crawler.mjs --pages=50       # explicit page count override
- */
+/*
+This module is a standalone entry point for running a Jikan-only anime crawl.
+It fetches pages from the Jikan API and upserts the results into the database,
+useful for debugging or manual backfilling with this specific source.
+*/
+
 import { getPool, recordSync, sleep, upsertAnimeBatch } from "./db.mjs";
 import * as jikan from "./sources/jikan.mjs";
 
@@ -39,7 +32,6 @@ async function main() {
       if (hasNextPage === false) break;
     } catch (err) {
       console.error(`  page ${page}/${PAGES} failed after retries: ${err.message}`);
-      // Keep going — one bad page shouldn't kill the whole manual run.
     }
     await sleep(jikan.REQUEST_DELAY_MS);
   }

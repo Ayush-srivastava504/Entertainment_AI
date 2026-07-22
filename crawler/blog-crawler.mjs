@@ -1,40 +1,18 @@
-/**
- * Blog crawler — fetches trending entertainment news from trusted RSS
- * feeds (movies, TV, anime, celebrities, gaming), summarizes each item,
- * and stores it in `blog_posts`. This is the only writer for that table.
- *
- * Summarization: this crawler has no dependency on the AI Creator service
- * (that's a separate build, task #3) — it produces a short EXTRACTIVE
- * summary from the feed's own excerpt (RSS `contentSnippet`/`content`),
- * never the full article body, and always links back to the source. If
- * AI_SUMMARY_ENDPOINT is set (pointing at the future AI Creator service's
- * REST endpoint), the crawler will call it per-item for a real abstractive
- * rewrite instead — see summarize() below. Until then it degrades cleanly
- * to the extractive path with zero config.
- *
- * Copyright: we only ever store what the feed itself publishes as an
- * excerpt (typically 1-3 sentences, meant for syndication) plus our own
- * summary of it, never a scrape of the full article — and every post
- * carries source_name/source_url attribution back to the original.
- *
- * Incremental by construction: `source_url` is unique in the DB, so
- * re-running against the same feeds is a no-op for stories already
- * imported (on conflict do nothing) — no separate "since last run"
- * bookkeeping needed.
- *
- *   node crawler/blog-crawler.mjs                # crawl all configured feeds
- *   node crawler/blog-crawler.mjs --limit=10       # cap items per feed
- */
+/*
+This module crawls trending entertainment news from trusted RSS feeds and
+stores them in the blog_posts table. It summarizes each item using either
+an AI service or an extractive approach, and handles feed failures gracefully
+with retry logic and skip tolerance.
+*/
+
 import Parser from "rss-parser";
 import { createHash } from "node:crypto";
 import { getPool, upsertBlogPosts, sleep } from "./db.mjs";
 import { withRetry, RetryableError } from "./lib/retry.mjs";
 
-const FEED_FAILURE_THRESHOLD = 3; // consecutive parse/fetch failures before skipping a feed for this run
+const FEED_FAILURE_THRESHOLD = 3;
 const REQUEST_DELAY_MS = 800;
 
-// Trusted, keyless, publicly syndicated RSS feeds. One entry can carry
-// multiple tags; `category` drives /blog/category/[category].
 const FEEDS = [
   { name: "Variety", url: "https://variety.com/feed/", category: "movies", tags: ["movies", "industry"] },
   { name: "The Hollywood Reporter", url: "https://www.hollywoodreporter.com/feed/", category: "celebrities", tags: ["celebrities", "industry"] },
@@ -66,9 +44,6 @@ function stripHtml(html) {
   return (html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-// Extractive summary: take the feed's own excerpt, split into sentences,
-// keep the first few — this is a paraphrase-length excerpt of what the
-// publisher already syndicates for exactly this purpose, not a scrape.
 function extractiveSummary(text, maxSentences = 3, maxChars = 500) {
   const clean = stripHtml(text);
   if (!clean) return [];
@@ -77,12 +52,6 @@ function extractiveSummary(text, maxSentences = 3, maxChars = 500) {
   return [picked.length > maxChars ? `${picked.slice(0, maxChars).trim()}…` : picked];
 }
 
-/**
- * Summarize one feed item into an array of body paragraphs. Calls out to
- * an AI Creator service if configured (AI_SUMMARY_ENDPOINT), else falls
- * back to the extractive summary above. A failed AI call falls back too
- * — summarization is never allowed to abort the crawl for one item.
- */
 async function summarize(item) {
   const sourceText = item.contentSnippet || item.content || item.summary || item.title || "";
   const endpoint = process.env.AI_SUMMARY_ENDPOINT;
@@ -115,10 +84,6 @@ async function toRow(item, feed) {
   const body = await summarize(item);
   const publishedAt = item.isoDate || item.pubDate || new Date().toISOString();
   const title = (item.title ?? "Untitled").trim();
-  // Hash the link, not the date, so the slug is 1:1 with source_url — the
-  // actual uniqueness key. Two different stories that happen to share a
-  // title on the same day never collide; the same story re-crawled always
-  // slugifies identically.
   const urlHash = createHash("sha1").update(item.link).digest("hex").slice(0, 8);
   return {
     slug: `${slugify(title)}-${urlHash}`,
@@ -138,7 +103,7 @@ async function fetchFeed(feed) {
     retries: 3,
     baseDelayMs: 1000,
     label: `feed ${feed.name}`,
-    isRetryable: () => true, // network/timeout/parse errors on an RSS fetch are all worth retrying
+    isRetryable: () => true,
   });
 }
 

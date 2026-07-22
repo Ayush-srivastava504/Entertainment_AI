@@ -1,20 +1,14 @@
-/**
- * Kitsu API — FALLBACK anime source, used only when AniList is failing.
- *
- * Free, keyless, JSON:API format. We pull `mappings` and `categories` as
- * sideloaded includes in the same request (no extra round-trip per anime):
- *  - mappings gives us the MyAnimeList ID when Kitsu knows it, so rows
- *    still land in the same DB row Jikan/AniList would have used.
- *  - categories gives us genre names.
- *
- * Kitsu already reports popularityRank/ratingRank directly (lower = more
- * popular), which matches the existing `anime` table's convention — no
- * rank inversion needed here, unlike AniList.
- */
+/*
+This module fetches anime data from the Kitsu API as a fallback source
+when AniList is unavailable. It includes mappings to find MyAnimeList IDs
+for database continuity and extracts categories as genres from sideloaded
+relationships.
+*/
+
 import { withRetry, RetryableError, SourcePageError } from "../lib/retry.mjs";
 
 export const SOURCE = "kitsu";
-export const PAGE_SIZE = 20; // Kitsu's practical max per page
+export const PAGE_SIZE = 20;
 export const REQUEST_DELAY_MS = 600;
 
 const ENDPOINT = "https://kitsu.io/api/edge/anime";
@@ -83,7 +77,7 @@ function toRow(item, includedIndex, rank) {
     status: STATUS_MAP[a.status] ?? a.status ?? null,
     type: TYPE_MAP[a.subtype] ?? a.subtype ?? null,
     genres: findGenres(item, includedIndex),
-    studios: [], // not sideloaded — not worth another include for a fallback-only path
+    studios: [],
     aired_from: a.startDate ?? null,
     aired_to: a.endDate ?? null,
     raw: item,
@@ -115,11 +109,6 @@ async function rawFetchPage(page, pageSize) {
   return res.json();
 }
 
-/**
- * @param {number} page 1-indexed page number
- * @param {{startRank: number}} opts running popularity-rank counter (used only
- *   as a fallback when a given anime has no popularityRank of its own)
- */
 export async function fetchPage(page, { startRank = 1 } = {}) {
   try {
     const json = await withRetry(() => rawFetchPage(page, PAGE_SIZE), {

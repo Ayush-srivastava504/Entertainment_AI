@@ -1,13 +1,9 @@
-/**
- * Anime reads — Postgres only. Never calls AniList/Kitsu/Jikan directly.
- *
- * The `anime` table is populated exclusively by crawler/anime-sync.mjs on
- * a schedule (see .github/workflows/sync.yml), which tries AniList first,
- * falls back to Kitsu, and falls back to Jikan last (crawler/sources/*.mjs).
- * This keeps request latency independent of any single upstream API's
- * rate limits and uptime, and lets every section below run as a fast,
- * indexed SQL query.
- */
+/*
+This module provides database access functions for anime data stored in Postgres.
+It includes methods for fetching anime by section, ID, rankings, genre, and studios.
+All queries are cached and the data is populated by a separate crawler process.
+*/
+
 import { getPool } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import type { MediaItem } from "@/lib/api/normalize";

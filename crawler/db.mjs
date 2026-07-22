@@ -1,3 +1,10 @@
+/*
+This module provides database utility functions for crawlers, including
+connection management, sync state recording, and batch upsert operations
+for blog posts, quizzes, and anime data. It handles transaction management
+and conflict resolution for each data type.
+*/
+
 import pg from "pg";
 
 const { Pool } = pg;
@@ -33,14 +40,6 @@ export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Upserts a batch of blog post rows from crawler/blog-crawler.mjs.
- * Conflicts on BOTH slug and source_url: slug so a re-run never creates a
- * duplicate route, source_url so the same story from the same feed is
- * never imported twice even if its title (and therefore slug) changes
- * slightly between fetches. Existing rows are refreshed (not skipped) so
- * a story's summary/likes-safe fields stay current; `likes` is left alone.
- */
 export async function upsertBlogPosts(rows) {
   if (rows.length === 0) return 0;
   const pool = getPool();
@@ -70,13 +69,6 @@ export async function upsertBlogPosts(rows) {
   }
 }
 
-/**
- * Upserts trivia quizzes from crawler/trivia-crawler.mjs. Each row is a
- * full "deck" (one entertainment category = one quiz), so on conflict we
- * refresh the question set in place rather than inserting duplicates —
- * that also means re-running the crawler naturally rotates in fresh
- * OpenTDB questions for the same slug over time.
- */
 export async function upsertQuizzes(rows) {
   if (rows.length === 0) return 0;
   const pool = getPool();
@@ -105,12 +97,6 @@ export async function upsertQuizzes(rows) {
   }
 }
 
-/**
- * Upserts a batch of anime rows, regardless of which source produced them
- * (anilist / kitsu / jikan all normalize to this exact shape — see
- * crawler/sources/*.mjs). Shared by crawler/anime-sync.mjs and the
- * standalone crawler/jikan-crawler.mjs debug entry point.
- */
 export async function upsertAnimeBatch(rows) {
   if (rows.length === 0) return 0;
   const pool = getPool();

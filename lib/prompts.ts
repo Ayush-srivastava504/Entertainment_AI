@@ -1,3 +1,9 @@
+/*
+This module defines the AI task types and builds system prompts for various
+content generation tools. Each task uses a specific instructional format
+tailored to the model's capabilities and the tool's requirements.
+*/
+
 export type Task =
   | "movie-recommend"
   | "anime-find"
@@ -5,11 +11,6 @@ export type Task =
   | "story-generate"
   | "thumbnail-feedback";
 
-/**
- * Every tool on the site calls the same model with a different system
- * framing. Keep instructions tight — small instruct models follow short,
- * concrete instructions far more reliably than long ones.
- */
 export function buildPrompt(task: Task, input: Record<string, string>): string {
   switch (task) {
     case "movie-recommend":

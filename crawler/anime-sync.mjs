@@ -1,39 +1,18 @@
-/**
- * Anime catalog sync — this is what .github/workflows/sync.yml and
- * `npm run crawl:anime` actually run.
- *
- * Priority chain: AniList (primary) -> Kitsu (fallback) -> Jikan (last
- * resort, kept because it's the flakiest under load — frequent 504s —
- * but still full-coverage and free).
- *
- * Fault tolerance model:
- *   - Each source module already retries transient failures (429/5xx/
- *     network) internally with exponential backoff (crawler/lib/retry.mjs).
- *   - If a single page still fails after those retries, we log it and
- *     move on — one bad page never aborts the whole crawl.
- *   - Only after FAILURE_THRESHOLD consecutive page failures from the
- *     same source do we treat that source as "down" and demote to the
- *     next one in the chain, picking up at the same page so no anime
- *     range gets silently skipped.
- *   - All three sources normalize into the identical row shape (see
- *     crawler/sources/*.mjs), and reuse the MyAnimeList id as the primary
- *     key whenever a source can supply one — so switching sources
- *     mid-crawl (or between runs) never creates duplicate rows or changes
- *     existing /anime/[slug] URLs. The frontend and lib/api/anime.ts
- *     don't need to change at all.
- *
- *   node crawler/anime-sync.mjs                 # incremental (~25 pages)
- *   node crawler/anime-sync.mjs --full          # full (~90 pages)
- *   node crawler/anime-sync.mjs --pages=50       # explicit page count override
- */
+/*
+This module synchronizes the anime catalog by fetching data from multiple
+sources in priority order (AniList -> Kitsu -> Jikan). It handles failures
+gracefully, demoting sources after consecutive failures and continuing
+with the next available source.
+*/
+
 import { getPool, recordSync, sleep, upsertAnimeBatch } from "./db.mjs";
 import * as anilist from "./sources/anilist.mjs";
 import * as kitsu from "./sources/kitsu.mjs";
 import * as jikan from "./sources/jikan.mjs";
 
-const SOURCE_CHAIN = [anilist, kitsu, jikan]; // priority order
+const SOURCE_CHAIN = [anilist, kitsu, jikan];
 
-const FAILURE_THRESHOLD = 3; // consecutive page failures before demoting a source
+const FAILURE_THRESHOLD = 3;
 
 const args = process.argv.slice(2);
 const isFull = args.includes("--full");
@@ -50,7 +29,7 @@ async function main() {
   let consecutiveFailures = 0;
   let totalUpserted = 0;
   let page = 1;
-  let rank = 1; // running popularity rank, shared across sources for continuity
+  let rank = 1;
   const usage = Object.fromEntries(SOURCE_CHAIN.map((s) => [s.SOURCE, { pages: 0, rows: 0 }]));
 
   while (page <= TOTAL_PAGES && sourceIdx < SOURCE_CHAIN.length) {
@@ -89,8 +68,6 @@ async function main() {
         );
         sourceIdx += 1;
         consecutiveFailures = 0;
-        // Deliberately do NOT advance `page` — the next source picks up
-        // the same range so nothing gets skipped.
       } else {
         await sleep(1000);
       }

@@ -1,16 +1,10 @@
-/**
- * Server-side Postgres client. Only ever imported from route handlers.
- *
- * Set DATABASE_URL in Vercel's Project Settings → Environment Variables.
- * Use whichever Postgres you provisioned (Neon, Supabase, RDS...) — just
- * make sure it's reachable from Vercel and from wherever GitHub Actions
- * runs the crawler scripts (both connect over the public internet, so no
- * special networking is required).
- *
- * Neon/Supabase pooled connection strings already include `sslmode=require`;
- * `rejectUnauthorized: false` below keeps this working with their default
- * self-signed-looking chain without extra config.
- */
+/*
+This module provides a server-side Postgres client and data access functions
+for the application. It includes database connection management, queue job
+handling, and read/write operations for blogs, rankings, quizzes, likes,
+comments, and chat messages.
+*/
+
 import { Pool } from "pg";
 
 let pool: Pool | null = null;
@@ -24,7 +18,7 @@ export function getPool(): Pool {
     pool = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: 3, // serverless functions: keep this small
+      max: 3,
     });
   }
   return pool;
@@ -60,9 +54,6 @@ export async function getQueueJob(id: string): Promise<QueueJob | null> {
   return rows[0] ?? null;
 }
 
-// Resolved inline by app/api/queue/route.ts (calls the AI endpoint
-// synchronously) rather than being drained by a separate batch job —
-// these just record the outcome for history/debugging.
 export async function markQueueJobDone(id: string, result: string): Promise<void> {
   await getPool().query(
     `update queue_jobs set status = 'done', result = $2, completed_at = now() where id = $1`,
@@ -77,14 +68,6 @@ export async function markQueueJobFailed(id: string, error: string): Promise<voi
   );
 }
 
-/**
- * Autonomous content — read-only from the frontend's point of view.
- * Every row here is written by the scheduled crawlers (crawler/*.mjs via
- * GitHub Actions), not by anything a user submitted. No writer functions
- * exist here on purpose: the app never creates or edits this content,
- * only reads it.
- */
-
 export interface BlogPostRow {
   slug: string;
   title: string;
@@ -98,10 +81,6 @@ export interface BlogPostRow {
   published_at: string;
 }
 
-// "trending" blends recency and likes (Hacker-News-style hot score: likes
-// decayed by age) so a popular old post doesn't bury today's post forever,
-// but a post that's genuinely getting liked still climbs. "recent" is a
-// plain published_at sort if you ever want it.
 const BLOG_TRENDING_ORDER = `
   order by likes / power(
     extract(epoch from (now() - published_at)) / 3600 + 2, 1.5
@@ -191,7 +170,6 @@ export interface QuizQuestion {
   options: QuizOption[];
 }
 
-/** A score-based result tier, e.g. { minScore: 7, maxScore: 10, title: "Trivia Champion", ... }. */
 export interface QuizResultTier {
   minScore: number;
   maxScore: number;
@@ -238,13 +216,6 @@ export async function getQuizBySlug(slug: string): Promise<QuizRow | null> {
   return rows[0] ?? null;
 }
 
-/**
- * Likes — one click increments a counter server-side. Anyone can call
- * this (no auth, matching the rest of the site), so treat it as a rough
- * popularity signal, not a tamper-proof vote. The client hides the
- * button after one click per browser (see LikeButton.tsx / localStorage)
- * as a light deterrent, not real vote integrity.
- */
 export async function incrementLikes(
   type: "blog" | "quiz",
   slug: string
@@ -257,11 +228,6 @@ export async function incrementLikes(
   return rows[0]?.likes ?? null;
 }
 
-/**
- * Comments — anyone can post, no login, matching the rest of the site.
- * content_type + content_slug point at a blog_posts.slug or quizzes.slug
- * without a foreign key, so this table stays decoupled from either.
- */
 export interface CommentRow {
   id: string;
   author_name: string;
@@ -297,15 +263,6 @@ export async function addComment(
   return rows[0];
 }
 
-/**
- * Global chat — one shared room, no login, matching the rest of the
- * site's trust model. Messages are intentionally ephemeral: instead of a
- * scheduled job or a separate worker, every read AND write opportunistically
- * deletes anything older than CHAT_TTL first. On a low/medium-traffic site
- * this keeps the table near-empty without any extra infrastructure — the
- * tradeoff is that a message can very rarely live a few seconds past 2
- * minutes if there's a lull in traffic, but never meaningfully longer.
- */
 export interface ChatMessageRow {
   id: string;
   author_name: string;

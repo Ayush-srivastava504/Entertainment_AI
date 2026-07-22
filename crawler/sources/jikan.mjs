@@ -1,17 +1,15 @@
-/**
- * Jikan (MyAnimeList) API — LAST-RESORT fallback anime source.
- *
- * This used to be the primary source; it's kept as the final fallback
- * because it's the one most prone to 504s under load, but it's still
- * free/keyless and has full catalog coverage. Its ids ARE MAL ids, so no
- * id-mapping is needed here — this is the source the `id` column was
- * originally keyed on.
- */
+/*
+This module fetches anime data from the Jikan API (MyAnimeList wrapper),
+serving as the last-resort fallback source. It handles rate limiting and
+retries, and its IDs are already MAL IDs, so no mapping is required for
+database continuity.
+*/
+
 import { withRetry, RetryableError, SourcePageError } from "../lib/retry.mjs";
 
 export const SOURCE = "jikan";
-export const PAGE_SIZE = 25; // Jikan's max page size
-export const REQUEST_DELAY_MS = 500; // ~2 req/sec, safely under Jikan's 3/sec limit
+export const PAGE_SIZE = 25;
+export const REQUEST_DELAY_MS = 500;
 
 const JIKAN_BASE = "https://api.jikan.moe/v4";
 
@@ -56,16 +54,10 @@ async function rawFetchPage(page, pageSize) {
   return res.json();
 }
 
-/**
- * @param {number} page 1-indexed page number
- * @param {{startRank: number}} opts running popularity-rank counter (Jikan
- *   already returns its own popularity rank per item; startRank is only a
- *   fallback for items missing one)
- */
 export async function fetchPage(page, { startRank = 1 } = {}) {
   try {
     const data = await withRetry(() => rawFetchPage(page, PAGE_SIZE), {
-      retries: 5, // Jikan is the flakiest source (frequent 504s) — retry harder before giving up
+      retries: 5,
       baseDelayMs: 500,
       label: `Jikan page ${page}`,
       isRetryable: (err) => err instanceof RetryableError,

@@ -1,11 +1,9 @@
-/**
- * Movie reads — Postgres only. Never calls an external API directly.
- *
- * Source is TMDB (The Movie Database) via crawler/tmdb-crawler.mjs — a
- * free, self-serve metadata API that also hosts poster/backdrop images
- * directly, so no separate poster-backfill step is needed. Rows without
- * a poster_path just render a placeholder.
- */
+/*
+This module provides database access functions for movie data stored in Postgres.
+It includes methods for fetching movies by section, ID, rankings, and genre.
+All queries are cached and the data is populated by a TMDB crawler process.
+*/
+
 import { getPool } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import type { MediaItem } from "@/lib/api/normalize";
@@ -59,8 +57,6 @@ export async function getMovieSection(
         params = [limit, offset];
         break;
       case "upcoming":
-        // Real anticipated-release data (TMDB movie/upcoming popularity), not a
-        // "recently added to the catalog" approximation.
         sql = `select * from movies where released_at is null or released_at > now()
                order by list_count desc nulls last limit $1 offset $2`;
         params = [limit, offset];
