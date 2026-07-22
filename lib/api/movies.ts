@@ -1,15 +1,13 @@
 /**
  * Movie reads — Postgres only. Never calls an external API directly.
  *
- * Source is YTS.mx (crawler/yts-crawler.mjs), a free, keyless movie API
- * — used instead of TMDB, which requires an API key and a paid-tier
- * quota to run at crawl volume. YTS's catalog is smaller than TMDB's and
- * skews toward already-released titles, so "upcoming"/"latest" are
- * approximated from date_uploaded (most recently added to the catalog)
- * rather than true theatrical release calendars. Swap in another
- * provider (e.g. OMDb) later by rewriting only crawler/yts-crawler.mjs —
- * this file and every page that imports it stay the same as long as the
- * `movies` table shape is preserved.
+ * Source is Trakt.tv (crawler/trakt-crawler.mjs), a legitimate free
+ * media-tracking API — used instead of TMDB (needs a paid-tier quota to
+ * run at crawl volume) and instead of YTS (a torrent/piracy index, not
+ * a real metadata API — its domain has since been taken down by
+ * copyright enforcement, which is exactly why it doesn't belong here).
+ * Poster art is optionally backfilled from OMDb by crawler/omdb-posters.mjs;
+ * rows without one just render a placeholder.
  */
 import { getPool } from "@/lib/db";
 import { cached } from "@/lib/cache";
@@ -22,7 +20,7 @@ function rowToMedia(row: any): MediaItem {
     id: String(row.id),
     kind: "movie",
     title: row.title,
-    description: (row.description ?? "A notable movie pick from the current catalog.")
+    description: (row.description ?? row.tagline ?? "A notable movie pick from the current catalog.")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 180),
@@ -30,7 +28,7 @@ function rowToMedia(row: any): MediaItem {
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
     genres: row.genres ?? [],
-    source: "yts",
+    source: "trakt",
   };
 }
 
@@ -52,11 +50,11 @@ export async function getMovieSection(
       case "search":
         if (!query.trim()) return [];
         sql = `select * from movies where title ilike $1
-               order by download_count desc nulls last limit $2 offset $3`;
+               order by plays desc nulls last limit $2 offset $3`;
         params = [`%${query.trim()}%`, limit, offset];
         break;
       case "popular":
-        sql = `select * from movies order by download_count desc nulls last limit $1 offset $2`;
+        sql = `select * from movies order by plays desc nulls last, watchers desc nulls last limit $1 offset $2`;
         params = [limit, offset];
         break;
       case "top-rated":
@@ -64,18 +62,20 @@ export async function getMovieSection(
         params = [limit, offset];
         break;
       case "upcoming":
-        // No forward-looking release calendar in YTS; approximate with
-        // the newest titles added to the catalog.
-        sql = `select * from movies order by date_uploaded desc nulls last limit $1 offset $2`;
+        // Real anticipated-release data (Trakt watchlist adds), not a
+        // "recently added to the catalog" approximation.
+        sql = `select * from movies where released_at is null or released_at > now()
+               order by list_count desc nulls last limit $1 offset $2`;
         params = [limit, offset];
         break;
       case "latest":
-        sql = `select * from movies order by date_uploaded desc nulls last limit $1 offset $2`;
+        sql = `select * from movies where released_at <= now()
+               order by released_at desc nulls last limit $1 offset $2`;
         params = [limit, offset];
         break;
       case "trending":
       default:
-        sql = `select * from movies order by download_count desc nulls last, date_uploaded desc nulls last limit $1 offset $2`;
+        sql = `select * from movies order by watchers desc nulls last, plays desc nulls last limit $1 offset $2`;
         params = [limit, offset];
         break;
     }

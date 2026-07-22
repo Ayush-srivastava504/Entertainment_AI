@@ -131,38 +131,56 @@ create index if not exists idx_anime_genres on anime using gin (genres);
 create index if not exists idx_anime_title_trgm on anime using gin (title gin_trgm_ops);
 
 -- ---------------------------------------------------------------------
--- Movie catalog — populated by crawler/yts-crawler.mjs (source: YTS.mx,
--- a free, keyless movie API — used instead of TMDB, which requires an
--- API key and per-request quotas). Nothing in app/ ever calls YTS
+-- Movie catalog — populated by crawler/trakt-crawler.mjs (source:
+-- Trakt.tv, a free API — free client_id, self-serve, instant, no
+-- approval wait). Poster art is optionally backfilled by
+-- crawler/omdb-posters.mjs (source: OMDb, free key) since Trakt itself
+-- doesn't host images. Nothing in app/ ever calls Trakt or OMDb
 -- directly; every page reads this table.
+--
+-- (Earlier revisions of this project used YTS.mx. That's a torrent/
+-- piracy site, not a legitimate metadata API, and its domain has since
+-- been taken down by copyright enforcement — removed for good reason.)
 -- ---------------------------------------------------------------------
 
 create table if not exists movies (
-  id              text primary key,       -- YTS movie id
+  id              text primary key,       -- Trakt id
   imdb_code       text,
+  tmdb_id         text,
+  slug            text,
   title           text not null,
+  tagline         text,
   description     text,
-  poster_url      text,
+  poster_url      text,                   -- filled by omdb-posters.mjs, null until then
   background_url  text,
   trailer_url     text,
   year            integer,
-  score           numeric,                -- 0-10
+  score           numeric,                -- 0-10, Trakt community rating
   runtime         integer,                -- minutes
   genres          text[] not null default '{}',
   language        text,
-  download_count  integer,                -- used as a popularity/trending proxy
-  like_count      integer,
-  date_uploaded   timestamptz,            -- used as a "recently added" proxy for upcoming/latest
+  watchers        integer,                -- currently watching (trending signal)
+  plays           integer,                -- all-time play count (popularity signal)
+  list_count      integer,                -- watchlist adds (anticipated/upcoming signal)
+  released_at     date,
   raw             jsonb not null,
   updated_at      timestamptz not null default now()
 );
 
 create index if not exists idx_movies_score on movies (score desc nulls last);
-create index if not exists idx_movies_downloads on movies (download_count desc nulls last);
+create index if not exists idx_movies_watchers on movies (watchers desc nulls last);
+create index if not exists idx_movies_plays on movies (plays desc nulls last);
+create index if not exists idx_movies_list_count on movies (list_count desc nulls last);
 create index if not exists idx_movies_year on movies (year desc nulls last);
-create index if not exists idx_movies_uploaded on movies (date_uploaded desc nulls last);
+create index if not exists idx_movies_released on movies (released_at desc nulls last);
 create index if not exists idx_movies_genres on movies using gin (genres);
 create index if not exists idx_movies_title_trgm on movies using gin (title gin_trgm_ops);
+
+-- Migrating a database that already has the old YTS-shaped `movies`
+-- table? Easiest path is dropping and recreating it, since the crawler
+-- source changed entirely and old rows aren't meaningfully reusable:
+--   drop table if exists movies;
+-- then re-run this file and `npm run crawl:movies:full`.
 
 -- ---------------------------------------------------------------------
 -- Crawl bookkeeping — one row per source, so the background sync knows

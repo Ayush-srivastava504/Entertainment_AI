@@ -46,7 +46,15 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run ${{ steps.mode.outputs.full == 'true' && 'crawl:anime:full' || 'crawl:anime' }}
 
-      - name: Crawl movies (YTS)
+      - name: Crawl movies (Trakt)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
         run: npm run ${{ steps.mode.outputs.full == 'true' && 'crawl:movies:full' || 'crawl:movies' }}
+
+      - name: Backfill posters (OMDb, optional)
+        if: ${{ vars.OMDB_ENABLED == 'true' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        run: npm run crawl:posters
