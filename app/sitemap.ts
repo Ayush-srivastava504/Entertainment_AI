@@ -1,8 +1,9 @@
 import { MetadataRoute } from "next";
 import { getRankings, getBlogPosts, getQuizzes } from "@/lib/db";
 
-// Set this to your real domain once you've deployed and connected it.
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+const BASE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site"
+).replace(/\/$/, "");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = [
@@ -21,8 +22,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(),
   }));
 
-  // All content-derived routes come from the DB — the daily pipeline run
-  // is the only thing that ever adds to these tables.
   const [animeRankings, movieRankings, blogPosts, quizzes] = await Promise.all([
     getRankings("anime"),
     getRankings("movie"),
@@ -50,5 +49,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(q.published_at),
   }));
 
-  return [...staticRoutes, ...animeRoutes, ...movieRoutes, ...blogRoutes, ...quizRoutes];
+  return [
+    ...staticRoutes,
+    ...animeRoutes,
+    ...movieRoutes,
+    ...blogRoutes,
+    ...quizRoutes,
+  ];
 }

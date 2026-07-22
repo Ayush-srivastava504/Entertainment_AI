@@ -1,12 +1,19 @@
 import { MetadataRoute } from "next";
 
+const BASE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site"
+).replace(/\/$/, "");
+
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: ["/api/", "/favorites"],
-    },
-    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"}/sitemap.xml`,
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/api/", "/favorites"],
+      },
+    ],
+    sitemap: `${BASE_URL}/sitemap.xml`,
+    host: BASE_URL,
   };
 }
