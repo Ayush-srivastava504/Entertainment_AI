@@ -24,6 +24,7 @@ function rowToMedia(row: any): MediaItem {
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
     genres: row.genres ?? [],
     source: "tmdb",
+    watchProviders: row.watch_providers ?? null,
   };
 }
 

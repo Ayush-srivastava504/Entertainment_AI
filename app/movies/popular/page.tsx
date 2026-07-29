@@ -1,5 +1,5 @@
 import { MediaShell } from "@/components/media/MediaShell";
-import { MediaGrid } from "@/components/media/MediaGrid";
+import { MediaGridInfinite } from "@/components/media/MediaGridInfinite";
 import { getMovieSection } from "@/lib/api/movies";
 
 export const metadata = {
@@ -7,14 +7,16 @@ export const metadata = {
   description: "Popular movies across the current catalog.",
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 24;
 
 export default async function PopularMoviesPage() {
-  const items = await getMovieSection("popular", "", 1, 12);
+  const items = await getMovieSection("popular", "", 1, PAGE_SIZE);
 
   return (
     <MediaShell title="Popular movies" eyebrow="🎬 movies" description="A browse of the most commonly watched movies right now." backHref="/movies">
-      <MediaGrid items={items} basePath="/movies" />
+      <MediaGridInfinite kind="movie" section="popular" initialItems={items} pageSize={PAGE_SIZE} basePath="/movies" />
     </MediaShell>
   );
 }

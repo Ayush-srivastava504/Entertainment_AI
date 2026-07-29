@@ -1,5 +1,5 @@
 import { MediaShell } from "@/components/media/MediaShell";
-import { MediaGrid } from "@/components/media/MediaGrid";
+import { MediaGridInfinite } from "@/components/media/MediaGridInfinite";
 import { getAnimeSection } from "@/lib/api/anime";
 
 export const metadata = {
@@ -9,12 +9,14 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 24;
+
 export default async function TopRatedAnimePage() {
-  const items = await getAnimeSection("top-rated", "", 1, 12);
+  const items = await getAnimeSection("top-rated", "", 1, PAGE_SIZE);
 
   return (
-    <MediaShell title="Top rated anime" eyebrow="🍥 anime" description="The highest-rated anime available through the current Jikan feed." backHref="/anime">
-      <MediaGrid items={items} basePath="/anime" />
+    <MediaShell title="Top rated anime" eyebrow="🍥 anime" description="The highest-rated anime in the current catalog." backHref="/anime">
+      <MediaGridInfinite kind="anime" section="top-rated" initialItems={items} pageSize={PAGE_SIZE} basePath="/anime" />
     </MediaShell>
   );
 }

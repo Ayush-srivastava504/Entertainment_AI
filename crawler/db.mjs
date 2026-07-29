@@ -97,6 +97,35 @@ export async function upsertQuizzes(rows) {
   }
 }
 
+export async function upsertRankings(rows) {
+  if (rows.length === 0) return 0;
+  const pool = getPool();
+  const client = await pool.connect();
+  let count = 0;
+  try {
+    await client.query("begin");
+    for (const r of rows) {
+      const res = await client.query(
+        `insert into rankings (category, slug, title, meta_description, intro, items)
+         values ($1,$2,$3,$4,$5,$6::jsonb)
+         on conflict (slug) do update set
+           category = excluded.category, title = excluded.title,
+           meta_description = excluded.meta_description, intro = excluded.intro,
+           items = excluded.items`,
+        [r.category, r.slug, r.title, r.meta_description, r.intro, JSON.stringify(r.items)]
+      );
+      count += res.rowCount;
+    }
+    await client.query("commit");
+    return count;
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function upsertAnimeBatch(rows) {
   if (rows.length === 0) return 0;
   const pool = getPool();

@@ -69,6 +69,35 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
             {movie.score ? <span className="rounded border border-marquee-line px-3 py-1">★ {movie.score.toFixed(1)}</span> : null}
             {movie.genres.map((genre) => <span key={genre} className="rounded border border-marquee-line px-3 py-1">{genre}</span>)}
           </div>
+
+          {movie.watchProviders && (movie.watchProviders.flatrate.length > 0 || movie.watchProviders.rent.length > 0 || movie.watchProviders.buy.length > 0) && (
+            <div className="mt-8">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-marquee-gold mb-3">Where to watch{movie.watchProviders.region ? ` (${movie.watchProviders.region})` : ""}</p>
+              {[
+                { label: "Stream", list: movie.watchProviders.flatrate },
+                { label: "Rent", list: movie.watchProviders.rent },
+                { label: "Buy", list: movie.watchProviders.buy },
+              ]
+                .filter((group) => group.list.length > 0)
+                .map((group) => (
+                  <div key={group.label} className="mb-3 flex flex-wrap items-center gap-2 text-sm text-marquee-textDim">
+                    <span className="w-14 shrink-0">{group.label}</span>
+                    {group.list.map((p) => (
+                      <span key={p.name} className="flex items-center gap-1.5 rounded border border-marquee-line px-2.5 py-1">
+                        {p.logo && <img src={p.logo} alt="" className="h-4 w-4 rounded-sm" />}
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              {movie.watchProviders.link && (
+                <a href={movie.watchProviders.link} target="_blank" rel="noreferrer" className="text-xs text-marquee-gold hover:underline">
+                  Full list on TMDB →
+                </a>
+              )}
+            </div>
+          )}
+
           <div className="mt-8">
             <Link href="/movies" className="rounded border border-marquee-line px-4 py-2 text-marquee-text">Back to movies hub</Link>
           </div>

@@ -28,7 +28,7 @@ function rowToMedia(row: any): MediaItem {
 }
 
 export async function getAnimeSection(
-  section: "trending" | "popular" | "top-rated" | "upcoming" | "search",
+  section: "trending" | "popular" | "top-rated" | "upcoming" | "airing" | "search",
   query = "",
   page = 1,
   limit = DEFAULT_LIMIT
@@ -59,6 +59,11 @@ export async function getAnimeSection(
       case "upcoming":
         sql = `select * from anime where status = 'Not yet aired'
                order by aired_from asc nulls last limit $1 offset $2`;
+        params = [limit, offset];
+        break;
+      case "airing":
+        sql = `select * from anime where status = 'Currently Airing'
+               order by aired_from desc nulls last limit $1 offset $2`;
         params = [limit, offset];
         break;
       case "trending":

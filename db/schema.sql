@@ -157,6 +157,9 @@ create table if not exists movies (
 
 create index if not exists idx_movies_score on movies (score desc nulls last);
 create index if not exists idx_movies_watchers on movies (watchers desc nulls last);
+
+alter table movies add column if not exists watch_providers jsonb;
+alter table movies add column if not exists watch_providers_synced_at timestamptz;
 create index if not exists idx_movies_plays on movies (plays desc nulls last);
 create index if not exists idx_movies_list_count on movies (list_count desc nulls last);
 create index if not exists idx_movies_year on movies (year desc nulls last);

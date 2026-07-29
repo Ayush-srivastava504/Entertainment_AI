@@ -1,5 +1,5 @@
 import { MediaShell } from "@/components/media/MediaShell";
-import { MediaGrid } from "@/components/media/MediaGrid";
+import { MediaGridInfinite } from "@/components/media/MediaGridInfinite";
 import { SearchBar } from "@/components/media/SearchBar";
 import { getAnimeSection } from "@/lib/api/anime";
 
@@ -8,6 +8,8 @@ export const metadata = {
   description: "Search through anime titles and filters.",
 };
 
+const PAGE_SIZE = 24;
+
 export default async function AnimeSearchPage({
   searchParams,
 }: {
@@ -15,14 +17,14 @@ export default async function AnimeSearchPage({
 }) {
   const params = (await searchParams) ?? {};
   const query = params.q ?? "";
-  const items = await getAnimeSection("search", query, 1, 12);
+  const items = await getAnimeSection("search", query, 1, PAGE_SIZE);
 
   return (
-    <MediaShell title="Search anime" eyebrow="🍥 anime" description="Search by title and browse the matching Jikan results." backHref="/anime">
+    <MediaShell title="Search anime" eyebrow="🍥 anime" description="Search by title and browse the matching results." backHref="/anime">
       <div className="mb-8">
         <SearchBar initialValue={query} path="/anime/search" />
       </div>
-      <MediaGrid items={items} basePath="/anime" />
+      <MediaGridInfinite kind="anime" section="search" query={query} initialItems={items} pageSize={PAGE_SIZE} basePath="/anime" />
     </MediaShell>
   );
 }

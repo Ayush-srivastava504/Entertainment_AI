@@ -1,5 +1,18 @@
 export type MediaKind = "anime" | "movie";
 
+export interface WatchProvider {
+  name: string;
+  logo: string | null;
+}
+
+export interface WatchProviders {
+  region: string | null;
+  link: string | null;
+  flatrate: WatchProvider[];
+  rent: WatchProvider[];
+  buy: WatchProvider[];
+}
+
 export interface MediaItem {
   id: string;
   kind: MediaKind;
@@ -10,6 +23,7 @@ export interface MediaItem {
   score?: number;
   genres: string[];
   source?: string;
+  watchProviders?: WatchProviders | null;
 }
 
 export function normalizeAnime(item: any): MediaItem {

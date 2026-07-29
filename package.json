@@ -15,8 +15,10 @@
     "crawl:movies:full": "node crawler/tmdb-crawler.mjs --full",
     "crawl:blog": "node crawler/blog-crawler.mjs",
     "crawl:trivia": "node crawler/trivia-crawler.mjs",
-    "crawl:all": "npm run crawl:anime && npm run crawl:movies && npm run crawl:blog && npm run crawl:trivia",
-    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full && npm run crawl:blog && npm run crawl:trivia"
+    "crawl:watch-providers": "node crawler/watch-providers-crawler.mjs",
+    "crawl:mood-lists": "node crawler/mood-lists-crawler.mjs",
+    "crawl:all": "npm run crawl:anime && npm run crawl:movies && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists",
+    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists"
   },
 
   "dependencies": {

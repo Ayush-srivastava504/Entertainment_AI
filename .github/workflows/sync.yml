@@ -64,3 +64,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run crawl:trivia
+
+      - name: Crawl watch providers (TMDB)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_READ_ACCESS_TOKEN: ${{ secrets.TMDB_API_READ_ACCESS_TOKEN }}
+        run: npm run crawl:watch-providers
+
+      - name: Build mood & decade rankings
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run crawl:mood-lists

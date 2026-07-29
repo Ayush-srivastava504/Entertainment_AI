@@ -96,10 +96,10 @@ async function resetSessionToken(token) {
   }
 }
 
-async function fetchDeck(category, amount, token) {
+async function fetchDeckAttempt(category, amount, token) {
   const baseUrl = `https://opentdb.com/api.php?amount=${amount}&category=${category}&type=multiple`;
 
-  const data = await withRetry(
+  return withRetry(
     async () => {
       const url = token ? `${baseUrl}&token=${token}` : baseUrl;
       const r = await fetch(url);
@@ -115,15 +115,37 @@ async function fetchDeck(category, amount, token) {
       if (RETRYABLE_RESPONSE_CODES.has(body.response_code)) {
         throw new RetryableError(`OpenTDB response_code=${body.response_code} (transient), retrying`);
       }
-      if (body.response_code !== 0 || !Array.isArray(body.results) || body.results.length === 0) {
-        throw new Error(`OpenTDB returned response_code=${body.response_code} for category ${category}`);
-      }
       return body;
     },
     { retries: 5, baseDelayMs: 5200, label: `opentdb category ${category}` }
   );
+}
 
-  return data.results;
+// OpenTDB returns response_code=1 ("no results") when a category doesn't have
+// `amount` questions of the requested type available. That isn't transient,
+// so retrying the same amount forever just wastes calls and drops the whole
+// deck. Instead step the requested amount down until the category can
+// satisfy it, rather than giving up entirely.
+async function fetchDeck(category, amount, token) {
+  const attempts = [...new Set([amount, 7, 5, 3].filter((n) => n <= amount))];
+
+  let lastErr;
+  for (const attemptAmount of attempts) {
+    try {
+      const body = await fetchDeckAttempt(category, attemptAmount, token);
+      if (body.response_code === 0 && Array.isArray(body.results) && body.results.length > 0) {
+        return body.results;
+      }
+      lastErr = new Error(`OpenTDB returned response_code=${body.response_code} for category ${category} at amount=${attemptAmount}`);
+      if (body.response_code !== 1) throw lastErr; // only step down on "no results", not other failures
+      console.warn(`trivia: category ${category} has fewer than ${attemptAmount} questions available, trying a smaller deck`);
+      await sleep(REQUEST_DELAY_MS);
+    } catch (err) {
+      lastErr = err;
+      break;
+    }
+  }
+  throw lastErr ?? new Error(`OpenTDB returned no usable results for category ${category}`);
 }
 
 function toQuestions(rawQuestions) {
