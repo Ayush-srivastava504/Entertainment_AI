@@ -1,5 +1,7 @@
 import { MetadataRoute } from "next";
 import { getRankings, getBlogPosts, getQuizzes } from "@/lib/db";
+import { getAllMovieIds } from "@/lib/api/movies";
+import { getAllAnimeIds } from "@/lib/api/anime";
 import { GENRE_SLUGS } from "@/lib/genres";
 
 const BASE_URL = (
@@ -41,12 +43,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/rankings/genre/${genre}`, lastModified: new Date() },
   ]);
 
-  const [animeRankings, movieRankings, blogPosts, quizzes] = await Promise.all([
-    getRankings("anime"),
-    getRankings("movie"),
-    getBlogPosts(),
-    getQuizzes(),
-  ]);
+  const [animeRankings, movieRankings, blogPosts, quizzes, movieIds, animeIds] =
+    await Promise.all([
+      getRankings("anime"),
+      getRankings("movie"),
+      getBlogPosts(),
+      getQuizzes(),
+      getAllMovieIds(),
+      getAllAnimeIds(),
+    ]);
+
+  // Individual title-detail pages — /movies/[id] and /anime/[id] — pulled
+  // straight from the DB so every crawled title gets a sitemap entry, not
+  // just the curated ranking lists above.
+  const movieDetailRoutes = movieIds.map(({ id, updatedAt }) => ({
+    url: `${BASE_URL}/movies/${id}`,
+    lastModified: updatedAt ?? new Date(),
+  }));
+
+  const animeDetailRoutes = animeIds.map(({ id, updatedAt }) => ({
+    url: `${BASE_URL}/anime/${id}`,
+    lastModified: updatedAt ?? new Date(),
+  }));
 
   // These previously pointed at /anime/[slug] and /movies/[slug], which are
   // the individual title-detail routes (looked up by TMDB/Jikan id) — the
@@ -76,6 +94,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticRoutes,
     ...genreRoutes,
+    ...movieDetailRoutes,
+    ...animeDetailRoutes,
     ...animeRoutes,
     ...movieRoutes,
     ...blogRoutes,

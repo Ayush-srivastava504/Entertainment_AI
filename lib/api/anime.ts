@@ -112,6 +112,25 @@ export async function getAnimeRankings(page = 1, limit = 100): Promise<MediaItem
   });
 }
 
+/**
+ * Lightweight id/updated_at list for every anime title, used to build the
+ * sitemap. Intentionally selects only two columns (not `select *`) since
+ * this can run over thousands of rows.
+ */
+export async function getAllAnimeIds(): Promise<{ id: string; updatedAt: Date }[]> {
+  return cached("anime:all-ids", 3600, async () => {
+    try {
+      const { rows } = await getPool().query(
+        "select id, updated_at from anime order by id"
+      );
+      return rows.map((row: any) => ({ id: String(row.id), updatedAt: row.updated_at }));
+    } catch (err) {
+      console.error("anime id list query failed:", err);
+      return [];
+    }
+  });
+}
+
 export async function getAnimeByGenre(genre: string, page = 1, limit = 12): Promise<MediaItem[]> {
   const offset = Math.max(0, (page - 1) * limit);
   return cached(`anime:genre:${genre}:${page}:${limit}`, 600, async () => {

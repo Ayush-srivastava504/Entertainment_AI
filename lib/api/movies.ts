@@ -112,6 +112,25 @@ export async function getMovieRankings(page = 1, limit = 100): Promise<MediaItem
   });
 }
 
+/**
+ * Lightweight id/updated_at list for every movie, used to build the sitemap.
+ * Intentionally selects only two columns (not `select *`) since this can run
+ * over thousands of rows.
+ */
+export async function getAllMovieIds(): Promise<{ id: string; updatedAt: Date }[]> {
+  return cached("movies:all-ids", 3600, async () => {
+    try {
+      const { rows } = await getPool().query(
+        "select id, updated_at from movies order by id"
+      );
+      return rows.map((row: any) => ({ id: String(row.id), updatedAt: row.updated_at }));
+    } catch (err) {
+      console.error("movie id list query failed:", err);
+      return [];
+    }
+  });
+}
+
 export async function getMovieByGenre(genre: string, page = 1, limit = 12): Promise<MediaItem[]> {
   const offset = Math.max(0, (page - 1) * limit);
   return cached(`movies:genre:${genre}:${page}:${limit}`, 600, async () => {
