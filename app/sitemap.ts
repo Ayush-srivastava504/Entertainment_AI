@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { getRankings, getBlogPosts, getQuizzes } from "@/lib/db";
+import { GENRE_SLUGS } from "@/lib/genres";
 
 const BASE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site"
@@ -9,18 +10,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = [
     "",
     "/movies",
+    "/movies/trending",
+    "/movies/popular",
+    "/movies/top-rated",
+    "/movies/upcoming",
+    "/movies/latest",
+    "/movies/search",
     "/anime",
+    "/anime/trending",
+    "/anime/popular",
+    "/anime/top-rated",
+    "/anime/upcoming",
+    "/anime/airing",
+    "/anime/search",
     "/rankings",
     "/rankings/anime",
     "/rankings/movies",
     "/search",
     "/quizzes",
     "/blog",
-    "/favorites",
+    "/tools/thumbnail-rating",
+    "/tools/tag-generator",
   ].map((path) => ({
     url: `${BASE_URL}${path}`,
     lastModified: new Date(),
   }));
+
+  const genreRoutes = GENRE_SLUGS.flatMap((genre) => [
+    { url: `${BASE_URL}/genres/${genre}`, lastModified: new Date() },
+    { url: `${BASE_URL}/rankings/genre/${genre}`, lastModified: new Date() },
+  ]);
 
   const [animeRankings, movieRankings, blogPosts, quizzes] = await Promise.all([
     getRankings("anime"),
@@ -29,13 +48,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getQuizzes(),
   ]);
 
+  // These previously pointed at /anime/[slug] and /movies/[slug], which are
+  // the individual title-detail routes (looked up by TMDB/Jikan id) — the
+  // mood-list slugs never matched a real title there, so every one of these
+  // URLs 404'd in Google Search Console. They now point at the dedicated
+  // mood-list pages under /rankings/anime/[slug] and /rankings/movies/[slug].
   const animeRoutes = animeRankings.map((r) => ({
-    url: `${BASE_URL}/anime/${r.slug}`,
+    url: `${BASE_URL}/rankings/anime/${r.slug}`,
     lastModified: new Date(r.published_at),
   }));
 
   const movieRoutes = movieRankings.map((r) => ({
-    url: `${BASE_URL}/movies/${r.slug}`,
+    url: `${BASE_URL}/rankings/movies/${r.slug}`,
     lastModified: new Date(r.published_at),
   }));
 
@@ -51,6 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticRoutes,
+    ...genreRoutes,
     ...animeRoutes,
     ...movieRoutes,
     ...blogRoutes,

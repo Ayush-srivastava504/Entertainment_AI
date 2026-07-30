@@ -30,7 +30,9 @@ const mono = IBM_Plex_Mono({
   variable: "--font-mono",
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+const BASE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site"
+).replace(/\/$/, "");
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
@@ -40,10 +42,26 @@ export const metadata: Metadata = {
   },
   description:
     "A polished entertainment marquee for browsing anime, movies, rankings, blog posts, and quizzes.",
+  keywords: [
+    "anime",
+    "movies",
+    "anime rankings",
+    "movie rankings",
+    "best anime to watch",
+    "best movies to watch",
+    "anime recommendations",
+    "movie recommendations",
+  ],
+  alternates: {
+    canonical: BASE_URL,
+  },
   openGraph: {
     siteName: "Marquee",
     type: "website",
     url: BASE_URL,
+    title: "Marquee — Discover anime, movies, rankings, and quizzes",
+    description:
+      "A polished entertainment marquee for browsing anime, movies, rankings, blog posts, and quizzes.",
   },
   twitter: {
     card: "summary_large_image",
@@ -51,6 +69,25 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+  },
+};
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Marquee",
+  url: BASE_URL,
+};
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Marquee",
+  url: BASE_URL,
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${BASE_URL}/movies/search?q={search_term_string}`,
+    "query-input": "required name=search_term_string",
   },
 };
 
@@ -62,6 +99,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="font-body min-h-screen flex flex-col">
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd).replace(/</g, "\\u003c") }}
+        />
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd).replace(/</g, "\\u003c") }}
+        />
         {/* Google tag (gtag.js) — loads after the page is interactive so it
             never blocks first paint; "afterInteractive" is the strategy
             Next.js recommends for analytics scripts. */}

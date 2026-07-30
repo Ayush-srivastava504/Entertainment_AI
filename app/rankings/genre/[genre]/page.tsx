@@ -2,16 +2,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAnimeByGenre } from "@/lib/api/anime";
 import { getMovieByGenre } from "@/lib/api/movies";
+import { GENRES, isValidGenreSlug, genreQueryForSlug } from "@/lib/genres";
 
-const allowedGenres = ["action", "comedy", "drama", "fantasy", "horror", "romance", "thriller"];
+const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
 export async function generateMetadata({ params }: { params: Promise<{ genre: string }> }) {
   const { genre } = await params;
-  if (!allowedGenres.includes(genre)) return {};
-  const label = genre.charAt(0).toUpperCase() + genre.slice(1);
+  if (!isValidGenreSlug(genre)) return {};
+  const label = GENRES.find((g) => g.slug === genre)?.label ?? genre;
+  const title = `Best ${label} Anime & Movies — Marquee`;
+  const description = `Top-ranked ${label.toLowerCase()} anime and movies, ranked and updated regularly.`;
+  const url = `${BASE_URL}/rankings/genre/${genre}`;
   return {
-    title: `Best ${label} Anime & Movies — Marquee`,
-    description: `Top-ranked ${genre} anime and movies, ranked and updated regularly.`,
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, type: "website" },
+    twitter: { card: "summary", title, description },
   };
 }
 
@@ -22,14 +29,15 @@ type GenreRankingPageProps = {
 
 export default async function GenreRankingPage({ params, searchParams }: GenreRankingPageProps) {
   const { genre } = await params;
-  if (!allowedGenres.includes(genre)) notFound();
+  if (!isValidGenreSlug(genre)) notFound();
+  const genreQuery = genreQueryForSlug(genre);
 
   const resolvedSearchParams = await searchParams;
   const page = Number(resolvedSearchParams?.page ?? 1);
   const safePage = Number.isFinite(page) && page > 0 ? page : 1;
   const [animeItems, movieItems] = await Promise.all([
-    getAnimeByGenre(genre, safePage, 12),
-    getMovieByGenre(genre, safePage, 12),
+    getAnimeByGenre(genreQuery, safePage, 12),
+    getMovieByGenre(genreQuery, safePage, 12),
   ]);
   const totalPages = 5;
 

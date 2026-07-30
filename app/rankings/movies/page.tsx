@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getMovieRankings } from "@/lib/api/movies";
+import { getRankings } from "@/lib/db";
 
 export const revalidate = 3600;
 
@@ -17,14 +18,33 @@ export default async function MovieRankingsPage({ searchParams }: MovieRankingsP
   const page = Number(resolvedSearchParams?.page ?? 1);
   const safePage = Number.isFinite(page) && page > 0 ? page : 1;
   const rankings = await getMovieRankings(safePage, 20);
+  const moodLists = await getRankings("movie", 24);
   const totalPages = 5;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">
       <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">⭐ movies</p>
-      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">Top 100 movies</h1>
-      <p className="mt-3 max-w-2xl text-marquee-textDim">A permanent top-100 ranking view powered by TMDB data.</p>
-      <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">Movie rankings</h1>
+      <p className="mt-3 max-w-2xl text-marquee-textDim">
+        Curated mood and decade lists, plus a permanent top-100 ranking view powered by TMDB data.
+      </p>
+
+      {moodLists.length > 0 && (
+        <>
+          <h2 className="mt-10 mb-4 font-display text-2xl text-marquee-text">Browse by mood &amp; decade</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {moodLists.map((list) => (
+              <Link key={list.slug} href={`/rankings/movies/${list.slug}`} className="ticket p-5 hover:border-marquee-gold transition-colors">
+                <h3 className="font-display text-xl text-marquee-text">{list.title}</h3>
+                <p className="mt-2 text-sm text-marquee-textDim">{list.meta_description}</p>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+
+      <h2 className="mt-14 mb-4 font-display text-2xl text-marquee-text">Top 100 movies</h2>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {rankings.map((ranking, index) => (
           <Link key={ranking.id} href={`/movies/${ranking.id}`} className="ticket p-5 hover:border-marquee-gold transition-colors">
             <p className="font-mono text-xs text-marquee-gold">#{(safePage - 1) * 20 + index + 1}</p>

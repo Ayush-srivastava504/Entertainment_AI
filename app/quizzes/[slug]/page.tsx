@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getQuizBySlug } from "@/lib/db";
 import QuizPlayer from "@/components/QuizPlayer";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
 export async function generateMetadata({
   params,

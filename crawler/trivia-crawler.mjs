@@ -117,7 +117,7 @@ async function fetchDeckAttempt(category, amount, token) {
       }
       return body;
     },
-    { retries: 5, baseDelayMs: 5200, label: `opentdb category ${category}` }
+    { retries: 3, baseDelayMs: 5200, maxDelayMs: 12000, label: `opentdb category ${category}` }
   );
 }
 
