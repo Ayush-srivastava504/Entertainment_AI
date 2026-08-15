@@ -6,6 +6,7 @@ and conflict resolution for each data type.
 */
 
 import pg from "pg";
+import { buildMediaSlug } from "./lib/slug.mjs";
 
 const { Pool } = pg;
 let pool;
@@ -133,22 +134,24 @@ export async function upsertAnimeBatch(rows) {
   try {
     await client.query("begin");
     for (const r of rows) {
+      const slug = buildMediaSlug(r.title_english || r.title, r.year, r.id);
       await client.query(
         `insert into anime (id, title, title_english, synopsis, poster_url, trailer_url, year, score,
                              popularity, rank, episodes, status, type, genres, studios, aired_from, aired_to,
-                             raw, source, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,now())
+                             raw, source, slug, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,now())
          on conflict (id) do update set
            title = excluded.title, title_english = excluded.title_english, synopsis = excluded.synopsis,
            poster_url = excluded.poster_url, trailer_url = excluded.trailer_url, year = excluded.year,
            score = excluded.score, popularity = excluded.popularity, rank = excluded.rank,
            episodes = excluded.episodes, status = excluded.status, type = excluded.type,
            genres = excluded.genres, studios = excluded.studios, aired_from = excluded.aired_from,
-           aired_to = excluded.aired_to, raw = excluded.raw, source = excluded.source, updated_at = now()`,
+           aired_to = excluded.aired_to, raw = excluded.raw, source = excluded.source, slug = excluded.slug,
+           updated_at = now()`,
         [
           r.id, r.title, r.title_english, r.synopsis, r.poster_url, r.trailer_url, r.year, r.score,
           r.popularity, r.rank, r.episodes, r.status, r.type, r.genres, r.studios, r.aired_from, r.aired_to,
-          JSON.stringify(r.raw), r.source,
+          JSON.stringify(r.raw), r.source, slug,
         ]
       );
     }

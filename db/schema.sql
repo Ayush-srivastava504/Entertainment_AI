@@ -122,6 +122,7 @@ create table if not exists anime (
 );
 
 alter table anime add column if not exists source text not null default 'jikan';
+alter table anime add column if not exists slug text;
 
 create index if not exists idx_anime_score on anime (score desc nulls last);
 create index if not exists idx_anime_popularity on anime (popularity asc nulls last);
@@ -130,6 +131,7 @@ create index if not exists idx_anime_status on anime (status);
 create index if not exists idx_anime_genres on anime using gin (genres);
 create index if not exists idx_anime_title_trgm on anime using gin (title gin_trgm_ops);
 create index if not exists idx_anime_source on anime (source);
+create unique index if not exists idx_anime_slug on anime (slug);
 
 create table if not exists movies (
   id              text primary key,
@@ -166,6 +168,23 @@ create index if not exists idx_movies_year on movies (year desc nulls last);
 create index if not exists idx_movies_released on movies (released_at desc nulls last);
 create index if not exists idx_movies_genres on movies using gin (genres);
 create index if not exists idx_movies_title_trgm on movies using gin (title gin_trgm_ops);
+create unique index if not exists idx_movies_slug on movies (slug);
+
+-- One-time backfill so rows crawled before slugs existed get a usable,
+-- name-based URL immediately instead of waiting for the next crawl run.
+-- The crawlers overwrite this with a slightly better JS-side slugify() on
+-- their next pass; this is just a safe, dependency-free approximation.
+update movies set slug =
+  trim(both '-' from regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g'))
+  || case when year is not null then '-' || year::text else '' end
+  || '-' || id
+where slug is null;
+
+update anime set slug =
+  trim(both '-' from regexp_replace(lower(coalesce(title_english, title)), '[^a-z0-9]+', '-', 'g'))
+  || case when year is not null then '-' || year::text else '' end
+  || '-' || id
+where slug is null;
 
 create table if not exists sync_state (
   source              text primary key,

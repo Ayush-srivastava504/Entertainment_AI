@@ -6,6 +6,7 @@ trailers, runtime, and external IDs.
 */
 
 import { getPool, recordSync, sleep } from "./db.mjs";
+import { buildMediaSlug } from "./lib/slug.mjs";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
@@ -79,18 +80,22 @@ function toRow(movie, statKey, genreMap, detail) {
     (v) => v.site === "YouTube" && v.type === "Trailer"
   );
 
+  const id = String(movie.id);
+  const title = movie.title ?? movie.name ?? "Untitled movie";
+  const year = movie.release_date ? Number(movie.release_date.slice(0, 4)) : null;
+
   const row = {
-    id: String(movie.id),
+    id,
     imdb_code: detail?.external_ids?.imdb_id ?? null,
-    tmdb_id: String(movie.id),
-    slug: null,
-    title: movie.title ?? movie.name ?? "Untitled movie",
+    tmdb_id: id,
+    slug: buildMediaSlug(title, year, id),
+    title,
     tagline: detail?.tagline || null,
     description: movie.overview ?? null,
     poster_url: posterUrl(movie.poster_path),
     background_url: backgroundUrl(movie.backdrop_path),
     trailer_url: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
-    year: movie.release_date ? Number(movie.release_date.slice(0, 4)) : null,
+    year,
     score: movie.vote_average ?? null,
     runtime: detail?.runtime ?? null,
     genres,

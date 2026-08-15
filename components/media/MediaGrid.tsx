@@ -5,7 +5,7 @@ export function MediaGrid({ items, basePath }: { items: MediaItem[]; basePath: s
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
-        <MediaCard key={item.id} item={item} href={`${basePath}/${item.id}`} />
+        <MediaCard key={item.id} item={item} href={`${basePath}/${item.slug}`} />
       ))}
     </div>
   );

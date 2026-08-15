@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
 import { getRankings, getBlogPosts, getQuizzes } from "@/lib/db";
-import { getAllMovieIds } from "@/lib/api/movies";
-import { getAllAnimeIds } from "@/lib/api/anime";
+import { getAllMovieSlugs } from "@/lib/api/movies";
+import { getAllAnimeSlugs } from "@/lib/api/anime";
 import { GENRE_SLUGS } from "@/lib/genres";
 
 const BASE_URL = (
@@ -43,26 +43,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/rankings/genre/${genre}`, lastModified: new Date() },
   ]);
 
-  const [animeRankings, movieRankings, blogPosts, quizzes, movieIds, animeIds] =
+  const [animeRankings, movieRankings, blogPosts, quizzes, movieSlugs, animeSlugs] =
     await Promise.all([
       getRankings("anime"),
       getRankings("movie"),
       getBlogPosts(),
       getQuizzes(),
-      getAllMovieIds(),
-      getAllAnimeIds(),
+      getAllMovieSlugs(),
+      getAllAnimeSlugs(),
     ]);
 
-  // Individual title-detail pages — /movies/[id] and /anime/[id] — pulled
-  // straight from the DB so every crawled title gets a sitemap entry, not
-  // just the curated ranking lists above.
-  const movieDetailRoutes = movieIds.map(({ id, updatedAt }) => ({
-    url: `${BASE_URL}/movies/${id}`,
+  // Individual title-detail pages — /movies/[slug] and /anime/[slug] —
+  // pulled straight from the DB so every crawled title gets a sitemap
+  // entry, not just the curated ranking lists above. Uses the name-based
+  // slug (e.g. "the-matrix-1999-603"), not the bare numeric catalog id.
+  const movieDetailRoutes = movieSlugs.map(({ slug, updatedAt }) => ({
+    url: `${BASE_URL}/movies/${slug}`,
     lastModified: updatedAt ?? new Date(),
   }));
 
-  const animeDetailRoutes = animeIds.map(({ id, updatedAt }) => ({
-    url: `${BASE_URL}/anime/${id}`,
+  const animeDetailRoutes = animeSlugs.map(({ slug, updatedAt }) => ({
+    url: `${BASE_URL}/anime/${slug}`,
     lastModified: updatedAt ?? new Date(),
   }));
 

@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
+import { getMovieSection } from "@/lib/api/movies";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() || "";
-  return NextResponse.json({ q, items: [] });
+  const page = Number(searchParams.get("page") ?? "1");
+  const limit = Number(searchParams.get("limit") ?? "12");
+
+  if (!q) {
+    return NextResponse.json({ q, items: [] });
+  }
+
+  const items = await getMovieSection("search", q, page, limit);
+  return NextResponse.json({ q, items });
 }

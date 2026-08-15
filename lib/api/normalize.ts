@@ -1,3 +1,5 @@
+import { buildMediaSlug } from "@/lib/slug";
+
 export type MediaKind = "anime" | "movie";
 
 export interface WatchProvider {
@@ -15,6 +17,10 @@ export interface WatchProviders {
 
 export interface MediaItem {
   id: string;
+  /** URL-safe, human-readable identifier, e.g. "the-matrix-1999-603". Always
+   *  present — falls back to a slugified title+id when the DB row predates
+   *  the slug column. Detail-page links should use this, not `id`. */
+  slug: string;
   kind: MediaKind;
   title: string;
   description: string;
@@ -32,8 +38,11 @@ export function normalizeAnime(item: any): MediaItem {
   const genres = Array.isArray(item?.genres)
     ? item.genres.map((genre: any) => genre?.name ?? genre).filter(Boolean)
     : [];
+  const id = String(item?.mal_id ?? item?.id ?? title);
+  const year = item?.year ?? item?.aired?.prop?.from?.year;
   return {
-    id: String(item?.mal_id ?? item?.id ?? title),
+    id,
+    slug: buildMediaSlug(title, year, id),
     kind: "anime",
     title,
     description: synopsis.replace(/\s+/g, " ").trim().slice(0, 180),
@@ -51,13 +60,16 @@ export function normalizeMovie(item: any): MediaItem {
   const genres = Array.isArray(item?.genres)
     ? item.genres.map((genre: any) => genre?.name ?? genre).filter(Boolean)
     : [];
+  const id = String(item?.id ?? title);
+  const year = item?.release_date ? Number(item.release_date.slice(0, 4)) : item?.first_air_date ? Number(item.first_air_date.slice(0, 4)) : undefined;
   return {
-    id: String(item?.id ?? title),
+    id,
+    slug: buildMediaSlug(title, year, id),
     kind: "movie",
     title,
     description: description.replace(/\s+/g, " ").trim().slice(0, 180),
     posterUrl: item?.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-    year: item?.release_date ? Number(item.release_date.slice(0, 4)) : item?.first_air_date ? Number(item.first_air_date.slice(0, 4)) : undefined,
+    year,
     score: item?.vote_average,
     genres,
     source: "tmdb",

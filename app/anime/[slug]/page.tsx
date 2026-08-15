@@ -1,15 +1,16 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getAnimeById } from "@/lib/api/anime";
+import { notFound, permanentRedirect } from "next/navigation";
+import { getAnimeBySlugOrId } from "@/lib/api/anime";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const anime = await getAnimeById(slug);
-  if (!anime) return {};
+  const result = await getAnimeBySlugOrId(slug);
+  if (!result) return {};
+  const { anime } = result;
 
-  const url = `${BASE_URL}/anime/${slug}`;
+  const url = `${BASE_URL}/anime/${anime.slug}`;
   const title = anime.year ? `${anime.title} (${anime.year}) — Marquee` : `${anime.title} — Marquee`;
   const description = anime.description || `Details, rating, and genres for ${anime.title}.`;
 
@@ -35,8 +36,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function AnimeDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const anime = await getAnimeById(slug);
-  if (!anime) notFound();
+  const result = await getAnimeBySlugOrId(slug);
+  if (!result) notFound();
+  const { anime, isCanonical } = result;
+
+  if (!isCanonical) {
+    permanentRedirect(`/anime/${anime.slug}`);
+  }
+
+  const url = `${BASE_URL}/anime/${anime.slug}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -48,12 +56,26 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
     ...(anime.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: anime.score, bestRating: 10 } } : {}),
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Anime", item: `${BASE_URL}/anime` },
+      { "@type": "ListItem", position: 2, name: anime.title, item: url },
+    ],
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
       <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded border border-marquee-line bg-marquee-panel">

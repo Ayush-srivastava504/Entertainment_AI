@@ -46,7 +46,7 @@ export default async function MovieRankingsPage({ searchParams }: MovieRankingsP
       <h2 className="mt-14 mb-4 font-display text-2xl text-marquee-text">Top 100 movies</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {rankings.map((ranking, index) => (
-          <Link key={ranking.id} href={`/movies/${ranking.id}`} className="ticket p-5 hover:border-marquee-gold transition-colors">
+          <Link key={ranking.id} href={`/movies/${ranking.slug}`} className="ticket p-5 hover:border-marquee-gold transition-colors">
             <p className="font-mono text-xs text-marquee-gold">#{(safePage - 1) * 20 + index + 1}</p>
             <h2 className="mt-2 font-display text-2xl text-marquee-text">{ranking.title}</h2>
             <p className="mt-2 text-sm text-marquee-textDim">{ranking.description}</p>

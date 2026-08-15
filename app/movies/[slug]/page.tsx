@@ -1,15 +1,19 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getMovieById } from "@/lib/api/movies";
+import { notFound, permanentRedirect } from "next/navigation";
+import { getMovieBySlugOrId } from "@/lib/api/movies";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const movie = await getMovieById(slug);
-  if (!movie) return {};
+  const result = await getMovieBySlugOrId(slug);
+  if (!result) return {};
+  const { movie } = result;
 
-  const url = `${BASE_URL}/movies/${slug}`;
+  // Always point canonical at the real slug, even while rendering the
+  // legacy numeric-id URL for a moment before it redirects — this keeps
+  // search engines from ever indexing two URLs for the same title.
+  const url = `${BASE_URL}/movies/${movie.slug}`;
   const title = movie.year ? `${movie.title} (${movie.year}) — Marquee` : `${movie.title} — Marquee`;
   const description = movie.description || `Details, rating, and genres for ${movie.title}.`;
 
@@ -35,8 +39,18 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function MovieDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const movie = await getMovieById(slug);
-  if (!movie) notFound();
+  const result = await getMovieBySlugOrId(slug);
+  if (!result) notFound();
+  const { movie, isCanonical } = result;
+
+  // Someone hit the old /movies/603 (or an out-of-date) URL — send them to
+  // the canonical name-based one with a permanent redirect so any inbound
+  // links/search rankings consolidate onto the new URL instead of split.
+  if (!isCanonical) {
+    permanentRedirect(`/movies/${movie.slug}`);
+  }
+
+  const url = `${BASE_URL}/movies/${movie.slug}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -49,12 +63,26 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
     ...(movie.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: movie.score, bestRating: 10 } } : {}),
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Movies", item: `${BASE_URL}/movies` },
+      { "@type": "ListItem", position: 2, name: movie.title, item: url },
+    ],
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
       <div className="grid gap-10 lg:grid-cols-[260px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded border border-marquee-line bg-marquee-panel">

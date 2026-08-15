@@ -58,7 +58,7 @@ export default async function GenreRankingPage({ params, searchParams }: GenreRa
           <h2 className="font-display text-3xl text-marquee-text">Anime</h2>
           <div className="mt-4 grid gap-4">
             {animeItems.map((item, index) => (
-              <Link key={item.id} href={`/anime/${item.id}`} className="ticket p-4 hover:border-marquee-gold transition-colors">
+              <Link key={item.id} href={`/anime/${item.slug}`} className="ticket p-4 hover:border-marquee-gold transition-colors">
                 <p className="font-mono text-xs text-marquee-gold">#{(safePage - 1) * 12 + index + 1}</p>
                 <h3 className="mt-1 font-display text-xl text-marquee-text">{item.title}</h3>
                 <p className="mt-2 text-sm text-marquee-textDim">{item.description}</p>
@@ -70,7 +70,7 @@ export default async function GenreRankingPage({ params, searchParams }: GenreRa
           <h2 className="font-display text-3xl text-marquee-text">Movies</h2>
           <div className="mt-4 grid gap-4">
             {movieItems.map((item, index) => (
-              <Link key={item.id} href={`/movies/${item.id}`} className="ticket p-4 hover:border-marquee-gold transition-colors">
+              <Link key={item.id} href={`/movies/${item.slug}`} className="ticket p-4 hover:border-marquee-gold transition-colors">
                 <p className="font-mono text-xs text-marquee-gold">#{(safePage - 1) * 12 + index + 1}</p>
                 <h3 className="mt-1 font-display text-xl text-marquee-text">{item.title}</h3>
                 <p className="mt-2 text-sm text-marquee-textDim">{item.description}</p>
