@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getRankingBySlug, getRankings } from "@/lib/db";
+import { buildOgImageUrl } from "@/lib/og";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -18,6 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const url = `${BASE_URL}/rankings/anime/${slug}`;
   const title = `${ranking.title} — Marquee`;
+  const ogImage = buildOgImageUrl({ title: ranking.title, badge: "RANKING" });
 
   return {
     title,
@@ -28,11 +30,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description: ranking.meta_description,
       url,
       type: "website",
+      images: [{ url: ogImage, width: 1200, height: 630, alt: ranking.title }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: ranking.title,
       description: ranking.meta_description,
+      images: [ogImage],
     },
   };
 }

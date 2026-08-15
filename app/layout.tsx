@@ -5,6 +5,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import GlobalChat from "@/components/GlobalChat";
+import { buildOgImageUrl } from "@/lib/og";
 
 // Google Analytics 4 measurement id. Falls back to the id already wired up
 // on the site; override with NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env
@@ -62,9 +63,28 @@ export const metadata: Metadata = {
     title: "Marquee — Discover anime, movies, rankings, and quizzes",
     description:
       "A polished entertainment marquee for browsing anime, movies, rankings, blog posts, and quizzes.",
+    images: [
+      {
+        url: buildOgImageUrl({
+          title: "Marquee",
+          subtitle: "Discover anime, movies, rankings, and quizzes",
+          badge: "MARQUEE",
+        }),
+        width: 1200,
+        height: 630,
+        alt: "Marquee — Discover anime, movies, rankings, and quizzes",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
+    images: [
+      buildOgImageUrl({
+        title: "Marquee",
+        subtitle: "Discover anime, movies, rankings, and quizzes",
+        badge: "MARQUEE",
+      }),
+    ],
   },
   robots: {
     index: true,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getAnimeBySlugOrId } from "@/lib/api/anime";
+import { buildOgImageUrl } from "@/lib/og";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -14,6 +15,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = anime.year ? `${anime.title} (${anime.year}) — Marquee` : `${anime.title} — Marquee`;
   const description = anime.description || `Details, rating, and genres for ${anime.title}.`;
 
+  const ogImage = buildOgImageUrl({
+    title: anime.title,
+    subtitle: anime.year ? String(anime.year) : undefined,
+    badge: "ANIME",
+    poster: anime.posterUrl,
+    rating: anime.score ? anime.score.toFixed(1) : undefined,
+  });
+
   return {
     title,
     description,
@@ -23,13 +32,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description,
       url,
       type: "video.tv_show",
-      images: anime.posterUrl ? [{ url: anime.posterUrl }] : undefined,
+      images: [{ url: ogImage, width: 1200, height: 630, alt: anime.title }],
     },
     twitter: {
-      card: anime.posterUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: anime.title,
       description,
-      images: anime.posterUrl ? [anime.posterUrl] : undefined,
+      images: [ogImage],
     },
   };
 }

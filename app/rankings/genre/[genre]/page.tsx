@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getAnimeByGenre } from "@/lib/api/anime";
 import { getMovieByGenre } from "@/lib/api/movies";
 import { GENRES, isValidGenreSlug, genreQueryForSlug } from "@/lib/genres";
+import { buildOgImageUrl } from "@/lib/og";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -13,12 +14,13 @@ export async function generateMetadata({ params }: { params: Promise<{ genre: st
   const title = `Best ${label} Anime & Movies — Marquee`;
   const description = `Top-ranked ${label.toLowerCase()} anime and movies, ranked and updated regularly.`;
   const url = `${BASE_URL}/rankings/genre/${genre}`;
+  const ogImage = buildOgImageUrl({ title: `Best ${label} Anime & Movies`, badge: "RANKING" });
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: "website" },
-    twitter: { card: "summary", title, description },
+    openGraph: { title, description, url, type: "website", images: [{ url: ogImage, width: 1200, height: 630, alt: title }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
 }
 

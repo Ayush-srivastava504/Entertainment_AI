@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getQuizBySlug } from "@/lib/db";
 import QuizPlayer from "@/components/QuizPlayer";
+import { buildOgImageUrl } from "@/lib/og";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -14,6 +15,7 @@ export async function generateMetadata({
   if (!quiz) return {};
 
   const url = `${BASE_URL}/quizzes/${slug}`;
+  const ogImage = buildOgImageUrl({ title: quiz.title, badge: "QUIZ" });
   return {
     title: `${quiz.title} — Marquee`,
     description: quiz.description,
@@ -23,11 +25,13 @@ export async function generateMetadata({
       description: quiz.description,
       url,
       type: "website",
+      images: [{ url: ogImage, width: 1200, height: 630, alt: quiz.title }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: quiz.title,
       description: quiz.description,
+      images: [ogImage],
     },
   };
 }

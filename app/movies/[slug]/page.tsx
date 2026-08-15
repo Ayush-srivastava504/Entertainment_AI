@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getMovieBySlugOrId } from "@/lib/api/movies";
+import { buildOgImageUrl } from "@/lib/og";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -17,6 +18,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = movie.year ? `${movie.title} (${movie.year}) — Marquee` : `${movie.title} — Marquee`;
   const description = movie.description || `Details, rating, and genres for ${movie.title}.`;
 
+  // A branded 1200x630 card built from the poster + title/rating, rather
+  // than handing platforms the raw TMDB poster — posters are portrait
+  // (2:3) and get awkwardly cropped/letterboxed as a landscape OG image.
+  const ogImage = buildOgImageUrl({
+    title: movie.title,
+    subtitle: movie.year ? String(movie.year) : undefined,
+    badge: "MOVIE",
+    poster: movie.posterUrl,
+    rating: movie.score ? movie.score.toFixed(1) : undefined,
+  });
+
   return {
     title,
     description,
@@ -26,13 +38,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description,
       url,
       type: "video.movie",
-      images: movie.posterUrl ? [{ url: movie.posterUrl }] : undefined,
+      images: [{ url: ogImage, width: 1200, height: 630, alt: movie.title }],
     },
     twitter: {
-      card: movie.posterUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: movie.title,
       description,
-      images: movie.posterUrl ? [movie.posterUrl] : undefined,
+      images: [ogImage],
     },
   };
 }

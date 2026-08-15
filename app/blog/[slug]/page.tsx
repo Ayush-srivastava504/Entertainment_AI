@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/db";
 import LikeButton from "@/components/LikeButton";
 import CommentSection from "@/components/CommentSection";
+import { buildOgImageUrl } from "@/lib/og";
+
+const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
 export const revalidate = 300;
 // Slugs are DB-driven (written by the scheduled blog crawler), not known at
@@ -16,7 +19,28 @@ export async function generateMetadata({
   const { slug } = await params;
   const post = await getBlogPostBySlug(slug);
   if (!post) return {};
-  return { title: `${post.title} — Marquee`, description: post.meta_description };
+
+  const url = `${BASE_URL}/blog/${slug}`;
+  const ogImage = buildOgImageUrl({ title: post.title, badge: post.category?.toUpperCase() || "BLOG" });
+
+  return {
+    title: `${post.title} — Marquee`,
+    description: post.meta_description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: post.title,
+      description: post.meta_description,
+      url,
+      type: "article",
+      images: [{ url: ogImage, width: 1200, height: 630, alt: post.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.meta_description,
+      images: [ogImage],
+    },
+  };
 }
 
 export default async function BlogPostPage({
