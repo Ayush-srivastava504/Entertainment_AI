@@ -1,68 +1,73 @@
-/*
-Backfills the `ai_description` column on `movies`/`anime` by rewriting the
-raw TMDB/Jikan synopsis into a longer, original paragraph via Groq.
 
-Why this is a separate, deliberately-throttled script rather than a
-one-off bulk job:
-
-  - It is resumable and idempotent. It only ever selects rows where
-    ai_description is still null, so it's safe to run on a schedule and
-    pick up wherever the last run left off — no cursor/offset bookkeeping,
-    no risk of double-billing a row.
-  - It is budget-capped per run (--limit, default 150) and paced with a
-    fixed delay between calls (--delay-ms, default 2200 ≈ 27 req/min) to
-    stay under Groq's free-tier RPM even before RPD comes into play.
-    Free-tier limits vary by model and change over time — check
-    https://console.groq.com/docs/rate-limits for your account's current
-    numbers before raising --limit, since some models cap as low as
-    1,000 requests/day shared across every Groq feature this project uses
-    (this script + the recommend/find/tag/story tools in lib/ai.ts).
-  - It prioritizes by popularity (watchers/plays for movies, popularity
-    for anime) descending, so the titles most likely to actually get
-    search traffic get elaborated first — not an arbitrary id order.
-  - A failed row (bad response, rate limit, network error) is logged and
-    skipped, not retried in the same run, so one flaky call can't burn
-    the rest of the run's budget in retries.
-
-Usage:
-  node crawler/elaborate-descriptions.mjs --table=movies --limit=150
-  node crawler/elaborate-descriptions.mjs --table=anime --limit=150
-*/
 
 import { getPool, sleep } from "./db.mjs";
 
 const args = process.argv.slice(2);
+
 const arg = (name, fallback) => {
   const hit = args.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.split("=").slice(1).join("=") : fallback;
 };
 
 const TABLE = arg("table", "movies");
-const LIMIT = Number(arg("limit", "150"));
+const LIMIT = Number(arg("limit", "1000"));
 const DELAY_MS = Number(arg("delay-ms", "2200"));
-const MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+
+const MODEL =
+  process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 if (!["movies", "anime"].includes(TABLE)) {
-  console.error(`Unknown --table=${TABLE}, expected "movies" or "anime"`);
+  console.error(
+    `Unknown --table=${TABLE}, expected "movies" or "anime"`
+  );
   process.exit(1);
 }
+
+if (!Number.isFinite(LIMIT) || LIMIT <= 0) {
+  console.error("--limit must be a positive number");
+  process.exit(1);
+}
+
+if (!Number.isFinite(DELAY_MS) || DELAY_MS < 0) {
+  console.error("--delay-ms must be zero or a positive number");
+  process.exit(1);
+}
+
 if (!GROQ_API_KEY) {
-  console.error("GROQ_API_KEY is not set — skipping (not a fatal error, so scheduled runs don't fail the whole workflow).");
+  console.error(
+    "GROQ_API_KEY is not set. Skipping without failing the workflow."
+  );
   process.exit(0);
 }
 
-function buildPrompt({ title, year, genres, kind, synopsis }) {
+function buildPrompt({
+  title,
+  year,
+  genres,
+  kind,
+  synopsis,
+}) {
   return [
     `You write original detail-page copy for a ${kind} database site.`,
-    "Rewrite the synopsis below into 2 short paragraphs (90-130 words",
-    "total) in your own words — do not copy phrases from the original.",
-    "Mention the premise, tone/genre, and what makes it distinctive.",
-    "No spoilers past the setup. No preamble, no title restatement,",
-    "no headings, plain prose only.",
+    "",
+    "Rewrite the synopsis below into 2 short paragraphs.",
+    "Write approximately 90-130 words total.",
+    "Use completely original wording.",
+    "Do not copy phrases from the source.",
+    "Explain the premise, tone, genre, and what makes the title distinctive.",
+    "Do not include spoilers beyond the basic setup.",
+    "Do not use headings.",
+    "Do not restate the title.",
+    "Do not add a preamble.",
+    "Return only the finished prose.",
     "",
     `Title: ${title}${year ? ` (${year})` : ""}`,
-    genres?.length ? `Genres: ${genres.join(", ")}` : "",
+    genres?.length
+      ? `Genres: ${genres.join(", ")}`
+      : "",
+    "",
     `Original synopsis: ${synopsis}`,
   ]
     .filter(Boolean)
@@ -70,71 +75,234 @@ function buildPrompt({ title, year, genres, kind, synopsis }) {
 }
 
 async function elaborate(row, kind) {
-  const title = kind === "movie" ? row.title : row.title_english || row.title;
-  const synopsis = kind === "movie" ? row.description : row.synopsis;
-  const prompt = buildPrompt({ title, year: row.year, genres: row.genres, kind, synopsis });
+  const title =
+    kind === "movie"
+      ? row.title
+      : row.title_english || row.title;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 220,
-      temperature: 0.6,
-    }),
+  const synopsis =
+    kind === "movie"
+      ? row.description
+      : row.synopsis;
+
+  if (!title) {
+    throw new Error("missing title");
+  }
+
+  if (!synopsis) {
+    throw new Error("missing synopsis");
+  }
+
+  const prompt = buildPrompt({
+    title,
+    year: row.year,
+    genres: row.genres,
+    kind,
+    synopsis,
   });
 
-  if (res.status === 429) throw new Error("rate limited (429)");
-  if (!res.ok) throw new Error(`Groq responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const res = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_completion_tokens: 500,
+        reasoning_effort: "low",
+        include_reasoning: false,
+        temperature: 0.6,
+      }),
+    }
+  );
 
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error("empty response");
+  const responseText = await res.text();
+
+  if (res.status === 429) {
+    throw new Error(
+      `rate limited (429): ${responseText.slice(0, 300)}`
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      `Groq responded ${res.status}: ${responseText.slice(0, 500)}`
+    );
+  }
+
+  let data;
+
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      `Groq returned invalid JSON: ${responseText.slice(0, 500)}`
+    );
+  }
+
+  const choice = data?.choices?.[0];
+
+  if (!choice) {
+    throw new Error(
+      `Groq returned no choices: ${JSON.stringify(data).slice(0, 500)}`
+    );
+  }
+
+  const message = choice.message;
+
+  if (!message) {
+    throw new Error(
+      `Groq returned no message: ${JSON.stringify(choice).slice(0, 500)}`
+    );
+  }
+
+  const text =
+    typeof message.content === "string"
+      ? message.content.trim()
+      : "";
+
+  if (!text) {
+    throw new Error(
+      `empty response from Groq: ${JSON.stringify(message).slice(0, 500)}`
+    );
+  }
+
   return text;
 }
 
 async function main() {
   const pool = getPool();
-  const kind = TABLE === "movies" ? "movie" : "anime";
 
-  const selectSql =
+  const kind =
     TABLE === "movies"
-      ? `select id, title, year, genres, description from movies
-         where ai_description is null and description is not null
-         order by watchers desc nulls last, plays desc nulls last
-         limit $1`
-      : `select id, title, title_english, year, genres, synopsis from anime
-         where ai_description is null and synopsis is not null
-         order by popularity asc nulls last
-         limit $1`;
+      ? "movie"
+      : "anime";
 
-  const { rows } = await pool.query(selectSql, [LIMIT]);
-  console.log(`[elaborate:${TABLE}] ${rows.length} row(s) queued (limit=${LIMIT}, model=${MODEL})`);
+  try {
+    const selectSql =
+      TABLE === "movies"
+        ? `
+          SELECT
+            id,
+            title,
+            year,
+            genres,
+            description
+          FROM movies
+          WHERE ai_description IS NULL
+            AND description IS NOT NULL
+          ORDER BY
+            watchers DESC NULLS LAST,
+            plays DESC NULLS LAST
+          LIMIT $1
+        `
+        : `
+          SELECT
+            id,
+            title,
+            title_english,
+            year,
+            genres,
+            synopsis
+          FROM anime
+          WHERE ai_description IS NULL
+            AND synopsis IS NOT NULL
+          ORDER BY
+            popularity ASC NULLS LAST
+          LIMIT $1
+        `;
 
-  let done = 0;
-  let failed = 0;
+    const { rows } = await pool.query(
+      selectSql,
+      [LIMIT]
+    );
 
-  for (const row of rows) {
-    try {
-      const aiDescription = await elaborate(row, kind);
-      await pool.query(
-        `update ${TABLE} set ai_description = $1, ai_description_generated_at = now() where id = $2`,
-        [aiDescription, row.id]
-      );
-      done++;
-    } catch (err) {
-      failed++;
-      console.warn(`[elaborate:${TABLE}] skipped id=${row.id}: ${err instanceof Error ? err.message : err}`);
+    console.log(
+      `[elaborate:${TABLE}] ${rows.length} row(s) queued ` +
+      `(limit=${LIMIT}, model=${MODEL}, delay=${DELAY_MS}ms)`
+    );
+
+    let done = 0;
+    let failed = 0;
+
+    for (const row of rows) {
+      try {
+        const aiDescription = await elaborate(
+          row,
+          kind
+        );
+
+        await pool.query(
+          `
+            UPDATE ${TABLE}
+            SET
+              ai_description = $1,
+              ai_description_generated_at = NOW()
+            WHERE id = $2
+          `,
+          [
+            aiDescription,
+            row.id,
+          ]
+        );
+
+        done++;
+
+        console.log(
+          `[elaborate:${TABLE}] completed ` +
+          `id=${row.id} (${done}/${rows.length})`
+        );
+      } catch (err) {
+        failed++;
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : String(err);
+
+        console.warn(
+          `[elaborate:${TABLE}] skipped ` +
+          `id=${row.id}: ${message}`
+        );
+      }
+
+      if (DELAY_MS > 0) {
+        await sleep(DELAY_MS);
+      }
     }
-    await sleep(DELAY_MS);
-  }
 
-  console.log(`[elaborate:${TABLE}] done=${done} failed=${failed}`);
-  await pool.end();
+    console.log("");
+    console.log(
+      `[elaborate:${TABLE}] finished`
+    );
+    console.log(
+      `[elaborate:${TABLE}] queued=${rows.length}`
+    );
+    console.log(
+      `[elaborate:${TABLE}] done=${done}`
+    );
+    console.log(
+      `[elaborate:${TABLE}] failed=${failed}`
+    );
+  } finally {
+    await pool.end();
+  }
 }
 
 main().catch((err) => {
-  console.error(`[elaborate:${TABLE}] fatal:`, err);
+  console.error(
+    `[elaborate:${TABLE}] fatal:`,
+    err
+  );
+
   process.exit(1);
 });
