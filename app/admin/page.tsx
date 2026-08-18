@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { getAdminStats } from "@/lib/admin-db";
 
+// This page always needs a live DB read (stats change constantly, and it's
+// gated behind login anyway) — force dynamic rendering so Vercel never
+// tries to statically pre-render it at build time against whatever DB
+// happens to be reachable during the build.
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboardPage() {
   const stats = await getAdminStats();
 
