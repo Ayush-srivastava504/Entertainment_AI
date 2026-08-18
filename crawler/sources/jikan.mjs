@@ -25,6 +25,7 @@ function toRow(item, rank) {
     trailer_url: item.trailer?.url ?? null,
     year: item.year ?? item.aired?.prop?.from?.year ?? null,
     score: item.score ?? null,
+    scored_by: item.scored_by ?? null,
     popularity: item.popularity ?? rank,
     rank: item.rank ?? null,
     episodes: item.episodes ?? null,

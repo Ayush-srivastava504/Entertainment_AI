@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { getAnimeBySlugOrId } from "@/lib/api/anime";
+import { getAnimeBySlugOrId, getSimilarAnime } from "@/lib/api/anime";
 import { buildOgImageUrl } from "@/lib/og";
+import { SimilarTitles } from "@/components/media/SimilarTitles";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -54,6 +55,7 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
   }
 
   const url = `${BASE_URL}/anime/${anime.slug}`;
+  const similar = await getSimilarAnime(anime.id, anime.genres);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -62,7 +64,16 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
     image: anime.posterUrl || undefined,
     description: anime.longDescription || anime.description || undefined,
     genre: anime.genres,
-    ...(anime.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: anime.score, bestRating: 10 } } : {}),
+    ...(anime.score && anime.ratingCount
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: anime.score,
+            bestRating: 10,
+            ratingCount: anime.ratingCount,
+          },
+        }
+      : {}),
   };
 
   const breadcrumbLd = {
@@ -110,6 +121,8 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
           </div>
         </div>
       </div>
+
+      <SimilarTitles items={similar} basePath="/anime" />
     </div>
   );
 }

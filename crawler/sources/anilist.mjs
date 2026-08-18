@@ -25,6 +25,7 @@ query ($page: Int, $perPage: Int) {
       coverImage { extraLarge large }
       trailer { id site }
       averageScore
+      stats { scoreDistribution { amount } }
       episodes
       status
       format
@@ -77,6 +78,9 @@ function toRow(m, rank) {
     trailer_url: m.trailer?.site === "youtube" && m.trailer?.id ? `https://www.youtube.com/watch?v=${m.trailer.id}` : null,
     year: m.seasonYear ?? m.startDate?.year ?? null,
     score: typeof m.averageScore === "number" ? Math.round(m.averageScore) / 10 : null,
+    scored_by: Array.isArray(m.stats?.scoreDistribution)
+      ? m.stats.scoreDistribution.reduce((sum, b) => sum + (b?.amount ?? 0), 0) || null
+      : null,
     popularity: rank,
     rank: null,
     episodes: m.episodes ?? null,

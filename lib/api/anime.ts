@@ -26,6 +26,7 @@ function rowToMedia(row: any): MediaItem {
     posterUrl: row.poster_url ?? undefined,
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
+    ratingCount: row.scored_by !== null && row.scored_by !== undefined ? Number(row.scored_by) : undefined,
     genres: row.genres ?? [],
     source: row.source ?? "jikan",
   };
@@ -159,6 +160,29 @@ export async function getAllAnimeSlugs(): Promise<{ slug: string; updatedAt: Dat
       }));
     } catch (err) {
       console.error("anime slug list query failed:", err);
+      return [];
+    }
+  });
+}
+
+export async function getSimilarAnime(id: string, genres: string[], limit = 6): Promise<MediaItem[]> {
+  if (!genres.length) return [];
+  return cached(`anime:similar:${id}:${limit}`, 900, async () => {
+    try {
+      const { rows } = await getPool().query(
+        // Same content-based approach as getSimilarMovies: rank by genre
+        // overlap, then by score/scored_by as tiebreakers.
+        `select *,
+                cardinality(array(select unnest(genres) intersect select unnest($1::text[]))) as overlap
+         from anime
+         where id != $2 and genres && $1::text[]
+         order by overlap desc, score desc nulls last, scored_by desc nulls last
+         limit $3`,
+        [genres, id, limit]
+      );
+      return rows.map(rowToMedia);
+    } catch (err) {
+      console.error("similar anime query failed:", err);
       return [];
     }
   });

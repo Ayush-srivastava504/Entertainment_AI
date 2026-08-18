@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { getMovieBySlugOrId } from "@/lib/api/movies";
+import { getMovieBySlugOrId, getSimilarMovies } from "@/lib/api/movies";
 import { buildOgImageUrl } from "@/lib/og";
+import { SimilarTitles } from "@/components/media/SimilarTitles";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.marquees.site").replace(/\/$/, "");
 
@@ -63,6 +64,7 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
   }
 
   const url = `${BASE_URL}/movies/${movie.slug}`;
+  const similar = await getSimilarMovies(movie.id, movie.genres);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -72,7 +74,16 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
     image: movie.posterUrl || undefined,
     description: movie.longDescription || movie.description || undefined,
     genre: movie.genres,
-    ...(movie.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: movie.score, bestRating: 10 } } : {}),
+    ...(movie.score && movie.ratingCount
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: movie.score,
+            bestRating: 10,
+            ratingCount: movie.ratingCount,
+          },
+        }
+      : {}),
   };
 
   const breadcrumbLd = {
@@ -149,6 +160,8 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
           </div>
         </div>
       </div>
+
+      <SimilarTitles items={similar} basePath="/movies" />
     </div>
   );
 }

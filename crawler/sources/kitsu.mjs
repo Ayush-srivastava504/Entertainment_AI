@@ -71,6 +71,9 @@ function toRow(item, includedIndex, rank) {
     score: typeof a.averageRating === "string" || typeof a.averageRating === "number"
       ? Math.round((parseFloat(a.averageRating) / 10) * 10) / 10
       : null,
+    scored_by: a.ratingFrequencies && typeof a.ratingFrequencies === "object"
+      ? Object.values(a.ratingFrequencies).reduce((sum, v) => sum + (Number(v) || 0), 0) || null
+      : null,
     popularity: a.popularityRank ?? rank,
     rank: a.ratingRank ?? null,
     episodes: a.episodeCount ?? null,

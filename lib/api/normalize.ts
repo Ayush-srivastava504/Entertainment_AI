@@ -32,6 +32,11 @@ export interface MediaItem {
   posterUrl?: string;
   year?: number;
   score?: number;
+  /** Real count of people who rated this (TMDB vote_count / Jikan scored_by /
+   *  AniList scoreDistribution sum / Kitsu ratingFrequencies sum). Only
+   *  present when the source actually reports one — used to populate JSON-LD
+   *  aggregateRating.ratingCount, which Google requires alongside ratingValue. */
+  ratingCount?: number;
   genres: string[];
   source?: string;
   watchProviders?: WatchProviders | null;
@@ -54,6 +59,7 @@ export function normalizeAnime(item: any): MediaItem {
     posterUrl: item?.images?.jpg?.image_url ?? item?.images?.webp?.image_url,
     year: item?.year ?? item?.aired?.prop?.from?.year,
     score: item?.score,
+    ratingCount: typeof item?.scored_by === "number" ? item.scored_by : undefined,
     genres,
     source: "jikan",
   };
@@ -76,6 +82,7 @@ export function normalizeMovie(item: any): MediaItem {
     posterUrl: item?.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
     year,
     score: item?.vote_average,
+    ratingCount: typeof item?.vote_count === "number" ? item.vote_count : undefined,
     genres,
     source: "tmdb",
   };

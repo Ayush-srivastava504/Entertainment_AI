@@ -107,44 +107,66 @@ async function fetchFeed(feed) {
   });
 }
 
+// How many items get summarized concurrently within a single feed. Item
+// summaries are independent (each is its own HTTP call to the AI endpoint,
+// or pure local string work for the extractive fallback), so there's no
+// reason to await them one at a time — that was the main source of the
+// crawl's wall-clock time (up to 15 items x 6 feeds run fully serially,
+// each with its own network round trip + retry backoff).
+const ITEM_CONCURRENCY = 5;
+
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 async function crawlFeed(feed) {
   const parsed = await fetchFeed(feed);
-  const items = (parsed.items ?? []).slice(0, PER_FEED_LIMIT);
-  const rows = [];
-  for (const item of items) {
-    if (!item.link || !item.title) continue;
-    rows.push(await toRow(item, feed));
-  }
+  const items = (parsed.items ?? []).slice(0, PER_FEED_LIMIT).filter((item) => item.link && item.title);
+  const rows = await mapWithConcurrency(items, ITEM_CONCURRENCY, (item) => toRow(item, feed));
   return rows;
+}
+
+async function crawlFeedWithRetries(feed) {
+  let attempt = 0;
+  while (attempt < FEED_FAILURE_THRESHOLD) {
+    try {
+      const rows = await crawlFeed(feed);
+      const count = await upsertBlogPosts(rows);
+      console.log(`  [${feed.name}] ${rows.length} item(s) processed, ${count} new/updated`);
+      return { fetched: rows.length, upserted: count };
+    } catch (err) {
+      attempt += 1;
+      console.error(`  [${feed.name}] attempt ${attempt}/${FEED_FAILURE_THRESHOLD} failed: ${err.message}`);
+    }
+  }
+  console.warn(`  [${feed.name}] skipping this feed for this run — will retry next scheduled run.`);
+  return { error: "gave up after retries" };
 }
 
 async function main() {
   console.log(`Blog crawl starting: ${FEEDS.length} feeds, up to ${PER_FEED_LIMIT} items each`);
-  let totalUpserted = 0;
-  const feedResults = {};
 
-  for (const feed of FEEDS) {
-    let attempt = 0;
-    let succeeded = false;
-    while (attempt < FEED_FAILURE_THRESHOLD && !succeeded) {
-      try {
-        const rows = await crawlFeed(feed);
-        const count = await upsertBlogPosts(rows);
-        totalUpserted += count;
-        feedResults[feed.name] = { fetched: rows.length, upserted: count };
-        console.log(`  [${feed.name}] ${rows.length} item(s) processed, ${count} new/updated`);
-        succeeded = true;
-      } catch (err) {
-        attempt += 1;
-        console.error(`  [${feed.name}] attempt ${attempt}/${FEED_FAILURE_THRESHOLD} failed: ${err.message}`);
-      }
-    }
-    if (!succeeded) {
-      feedResults[feed.name] = { error: "gave up after retries" };
-      console.warn(`  [${feed.name}] skipping this feed for this run — will retry next scheduled run.`);
-    }
-    await sleep(REQUEST_DELAY_MS);
-  }
+  // Feeds are on entirely different domains, so there's no shared rate limit
+  // that requires running them one after another — crawl them all at once.
+  // REQUEST_DELAY_MS is still respected per-feed via a small stagger so we
+  // don't fire all six requests in the exact same instant.
+  const settled = await Promise.all(
+    FEEDS.map(async (feed, i) => {
+      await sleep(i * REQUEST_DELAY_MS);
+      return [feed.name, await crawlFeedWithRetries(feed)];
+    })
+  );
+  const feedResults = Object.fromEntries(settled);
+  const totalUpserted = Object.values(feedResults).reduce((sum, r) => sum + (r.upserted ?? 0), 0);
 
   console.log(`Blog crawl done: ${totalUpserted} post(s) upserted.`, feedResults);
   await getPool().end();

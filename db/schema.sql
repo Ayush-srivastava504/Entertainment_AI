@@ -129,6 +129,13 @@ alter table anime add column if not exists ai_description text;
 alter table anime add column if not exists ai_description_generated_at timestamptz;
 create index if not exists idx_anime_needs_ai_description on anime (popularity asc nulls last) where ai_description is null;
 
+-- Real "number of people who scored this" count (Jikan: scored_by, AniList:
+-- sum of stats.scoreDistribution, Kitsu: sum of ratingFrequencies). Needed
+-- so JSON-LD aggregateRating can carry a genuine ratingCount instead of
+-- omitting it (Google Rich Results flags aggregateRating without
+-- ratingCount/reviewCount as an invalid item).
+alter table anime add column if not exists scored_by integer;
+
 create index if not exists idx_anime_score on anime (score desc nulls last);
 create index if not exists idx_anime_popularity on anime (popularity asc nulls last);
 create index if not exists idx_anime_year on anime (year desc nulls last);
@@ -164,6 +171,11 @@ create table if not exists movies (
 
 create index if not exists idx_movies_score on movies (score desc nulls last);
 create index if not exists idx_movies_watchers on movies (watchers desc nulls last);
+
+-- Real vote count from TMDB. Needed so JSON-LD aggregateRating can carry a
+-- genuine ratingCount instead of omitting it (Google Rich Results flags
+-- aggregateRating without ratingCount/reviewCount as an invalid item).
+alter table movies add column if not exists vote_count integer;
 
 alter table movies add column if not exists watch_providers jsonb;
 alter table movies add column if not exists watch_providers_synced_at timestamptz;

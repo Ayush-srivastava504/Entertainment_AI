@@ -97,6 +97,7 @@ function toRow(movie, statKey, genreMap, detail) {
     trailer_url: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
     year,
     score: movie.vote_average ?? null,
+    vote_count: movie.vote_count ?? null,
     runtime: detail?.runtime ?? null,
     genres,
     language: movie.original_language ?? null,
@@ -120,15 +121,15 @@ async function upsertBatch(rows) {
     for (const r of rows) {
       await client.query(
         `insert into movies (id, imdb_code, tmdb_id, slug, title, tagline, description, poster_url, background_url,
-                              trailer_url, year, score, runtime, genres, language, watchers, plays, list_count,
+                              trailer_url, year, score, vote_count, runtime, genres, language, watchers, plays, list_count,
                               released_at, raw, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,now())
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now())
          on conflict (id) do update set
            imdb_code = coalesce(excluded.imdb_code, movies.imdb_code), tmdb_id = excluded.tmdb_id, slug = excluded.slug,
            title = excluded.title, tagline = coalesce(excluded.tagline, movies.tagline), description = excluded.description,
            poster_url = coalesce(excluded.poster_url, movies.poster_url), background_url = coalesce(excluded.background_url, movies.background_url),
            trailer_url = coalesce(excluded.trailer_url, movies.trailer_url),
-           year = excluded.year, score = excluded.score,
+           year = excluded.year, score = excluded.score, vote_count = excluded.vote_count,
            runtime = coalesce(excluded.runtime, movies.runtime), genres = excluded.genres, language = excluded.language,
            watchers = coalesce(excluded.watchers, movies.watchers),
            plays = coalesce(excluded.plays, movies.plays),
@@ -136,7 +137,7 @@ async function upsertBatch(rows) {
            released_at = excluded.released_at, raw = excluded.raw, updated_at = now()`,
         [
           r.id, r.imdb_code, r.tmdb_id, r.slug, r.title, r.tagline, r.description, r.poster_url, r.background_url,
-          r.trailer_url, r.year, r.score, r.runtime, r.genres, r.language, r.watchers, r.plays, r.list_count,
+          r.trailer_url, r.year, r.score, r.vote_count, r.runtime, r.genres, r.language, r.watchers, r.plays, r.list_count,
           r.released_at, JSON.stringify(r.raw),
         ]
       );

@@ -28,6 +28,7 @@ function rowToMedia(row: any): MediaItem {
     posterUrl: row.poster_url ?? undefined,
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
+    ratingCount: row.vote_count !== null && row.vote_count !== undefined ? Number(row.vote_count) : undefined,
     genres: row.genres ?? [],
     source: "tmdb",
     watchProviders: row.watch_providers ?? null,
@@ -161,6 +162,32 @@ export async function getAllMovieSlugs(): Promise<{ slug: string; updatedAt: Dat
       }));
     } catch (err) {
       console.error("movie slug list query failed:", err);
+      return [];
+    }
+  });
+}
+
+export async function getSimilarMovies(id: string, genres: string[], limit = 6): Promise<MediaItem[]> {
+  if (!genres.length) return [];
+  return cached(`movies:similar:${id}:${limit}`, 900, async () => {
+    try {
+      const { rows } = await getPool().query(
+        // Content-based similarity: rank by how many genres overlap with the
+        // source title (array intersection), then by score/vote_count as
+        // tiebreakers so well-attested titles surface first among equally
+        // relevant ones. No embeddings/ML needed — genre overlap is a strong
+        // signal here since TMDB genre tagging is fairly clean.
+        `select *,
+                cardinality(array(select unnest(genres) intersect select unnest($1::text[]))) as overlap
+         from movies
+         where id != $2 and genres && $1::text[]
+         order by overlap desc, score desc nulls last, vote_count desc nulls last
+         limit $3`,
+        [genres, id, limit]
+      );
+      return rows.map(rowToMedia);
+    } catch (err) {
+      console.error("similar movies query failed:", err);
       return [];
     }
   });
