@@ -40,7 +40,7 @@ const arg = (name, fallback) => {
 const TABLE = arg("table", "movies");
 const LIMIT = Number(arg("limit", "150"));
 const DELAY_MS = Number(arg("delay-ms", "2200"));
-const MODEL = process.env.GROQ_MODEL || "GROQ_MODEL=llama-3.3-70b-versatile";
+const MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 if (!["movies", "anime"].includes(TABLE)) {
