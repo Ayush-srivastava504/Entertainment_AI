@@ -9,8 +9,7 @@ export type Task =
   | "anime-find"
   | "tag-generate"
   | "story-generate"
-  | "thumbnail-feedback"
-  | "shorts-generate";
+  | "thumbnail-feedback";
 
 export function buildPrompt(task: Task, input: Record<string, string>): string {
   switch (task) {
@@ -63,26 +62,6 @@ export function buildPrompt(task: Task, input: Record<string, string>): string {
         "",
         `Metrics: ${input.metrics}`,
       ].join("\n");
-
-    case "shorts-generate":
-      return [
-        "You write vertical story-card sets (like Instagram/TikTok Stories) for",
-        "a movie/anime database page. Given a title's real data below, output",
-        "ONLY a JSON array of 5 objects, each { \"heading\": string (max 6 words),",
-        "\"text\": string (max 220 characters) }. Card 1 is a hook. Cards 2-4 cover",
-        "distinct angles (premise, standout element, vibe/tone, who it's for) —",
-        "never restate the synopsis verbatim. Card 5 is a closing line inviting",
-        "the reader to open the full page. No preamble, no markdown fences, no",
-        "commentary — the response must be valid JSON and nothing else.",
-        "",
-        `Title: ${input.title}`,
-        input.year ? `Year: ${input.year}` : "",
-        input.genres ? `Genres: ${input.genres}` : "",
-        input.score ? `Score: ${input.score}/10` : "",
-        input.synopsis ? `Known synopsis: ${input.synopsis}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
 
     default:
       throw new Error(`Unknown task: ${task satisfies never}`);

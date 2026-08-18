@@ -1,75 +1,17 @@
 /*
 This crawler generates "shorts" — 5-card vertical story sets, one per
 anime/movie title, for the /stories swipeable feed. It runs offline in
-batches (not on-request):
-
-  1. Picks titles that don't have a shorts row yet, best-scored first.
-  2. If HF_SPACE_URL is configured, asks the AI endpoint for 5 cards.
-  3. Falls back to a template built from real DB fields (title, year,
-     score, genres, synopsis) if AI is unavailable or the call fails —
-     so this script always produces something, no external service
-     required to get the feature working end to end.
+batches (not on-request), purely from data already in the anime/movies
+tables — no external API and no LLM involved, so it's cheap to run on
+every sync and never depends on an AI endpoint being configured.
 
 Run standalone: `node crawler/shorts-crawler.mjs [--limit=50]`
 */
 
-import { getPool, sleep } from "./db.mjs";
+import { getPool } from "./db.mjs";
 import { slugifyTitle } from "./lib/slug.mjs";
 
 const BATCH_LIMIT = Number(process.argv.find((a) => a.startsWith("--limit="))?.split("=")[1] ?? 40);
-const AI_URL = process.env.HF_SPACE_URL;
-const AI_TOKEN = process.env.HF_TOKEN;
-
-function buildPrompt(title) {
-  return [
-    "You write vertical story-card sets (like Instagram/TikTok Stories) for",
-    "a movie/anime database page. Given a title's real data below, output",
-    'ONLY a JSON array of 5 objects, each { "heading": string (max 6 words),',
-    '"text": string (max 220 characters) }. Card 1 is a hook. Cards 2-4 cover',
-    "distinct angles (premise, standout element, vibe/tone, who it's for) —",
-    "never restate the synopsis verbatim. Card 5 is a closing line inviting",
-    "the reader to open the full page. No preamble, no markdown fences, no",
-    "commentary — the response must be valid JSON and nothing else.",
-    "",
-    `Title: ${title.title}`,
-    title.year ? `Year: ${title.year}` : "",
-    title.genres?.length ? `Genres: ${title.genres.join(", ")}` : "",
-    title.score ? `Score: ${title.score}/10` : "",
-    title.synopsis ? `Known synopsis: ${title.synopsis}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-async function generateWithAI(title) {
-  if (!AI_URL) return null;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (AI_TOKEN) headers.Authorization = `Bearer ${AI_TOKEN}`;
-    const res = await fetch(AI_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ prompt: buildPrompt(title), max_tokens: 500, temperature: 0.8 }),
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = (data.text ?? "").trim().replace(/^```json\s*|```$/g, "");
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed) || parsed.length < 3) return null;
-    return parsed
-      .filter((c) => c && typeof c.heading === "string" && typeof c.text === "string")
-      .slice(0, 6)
-      .map((c) => ({ heading: c.heading.slice(0, 80), text: c.text.slice(0, 280) }));
-  } catch (err) {
-    console.warn(`  AI generation failed for "${title.title}": ${err.message}`);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 function buildTemplateCards(title) {
   const kindLabel = title.contentType === "anime" ? "anime" : "movie";
@@ -134,18 +76,15 @@ async function upsertShort(pool, title, cards) {
 
 async function main() {
   const pool = getPool();
-  console.log(AI_URL ? "AI endpoint configured — generating with AI, template fallback on failure." : "No HF_SPACE_URL set — using template-based cards.");
 
   for (const kind of ["anime", "movie"]) {
     const titles = await pickTitlesMissingShorts(pool, kind, Math.ceil(BATCH_LIMIT / 2));
     console.log(`${kind}: ${titles.length} titles missing shorts (this batch)`);
 
     for (const title of titles) {
-      const aiCards = await generateWithAI(title);
-      const cards = aiCards ?? buildTemplateCards(title);
+      const cards = buildTemplateCards(title);
       await upsertShort(pool, title, cards);
-      console.log(`  + ${title.title} (${aiCards ? "AI" : "template"})`);
-      if (AI_URL) await sleep(400); // gentle on the AI endpoint
+      console.log(`  + ${title.title}`);
     }
   }
 
