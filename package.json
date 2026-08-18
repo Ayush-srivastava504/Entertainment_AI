@@ -17,8 +17,9 @@
     "crawl:trivia": "node crawler/trivia-crawler.mjs",
     "crawl:watch-providers": "node crawler/watch-providers-crawler.mjs",
     "crawl:mood-lists": "node crawler/mood-lists-crawler.mjs",
-    "crawl:all": "npm run crawl:anime && npm run crawl:movies && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists",
-    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists"
+    "crawl:shorts": "node crawler/shorts-crawler.mjs",
+    "crawl:all": "npm run crawl:anime && npm run crawl:movies && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists && npm run crawl:shorts",
+    "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists && npm run crawl:shorts"
   },
 
   "dependencies": {

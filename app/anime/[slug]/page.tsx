@@ -27,6 +27,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: url },
+    // Thin/duplicate catalog pages flipped off in /admin stay reachable
+    // (direct link, comments) but drop out of Google's index and the sitemap.
+    robots: anime.noindex ? { index: false, follow: true } : undefined,
     openGraph: {
       title: anime.title,
       description,

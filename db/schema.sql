@@ -196,3 +196,31 @@ create table if not exists sync_state (
 );
 
 alter table sync_state add column if not exists details jsonb;
+-- Admin controls: manual quality/visibility overrides for thin-content
+-- cleanup (see GSC "Discovered/Crawled - currently not indexed" issue).
+alter table anime add column if not exists noindex boolean not null default false;
+alter table anime add column if not exists featured boolean not null default false;
+alter table anime add column if not exists synopsis_override text;
+
+alter table movies add column if not exists noindex boolean not null default false;
+alter table movies add column if not exists featured boolean not null default false;
+alter table movies add column if not exists synopsis_override text;
+
+create index if not exists idx_anime_featured on anime (featured) where featured = true;
+create index if not exists idx_movies_featured on movies (featured) where featured = true;
+
+-- Shorts: vertical swipeable story cards per anime/movie title, generated
+-- offline in batches (crawler/shorts-crawler.mjs), not on-request.
+create table if not exists shorts (
+  id            uuid primary key default gen_random_uuid(),
+  content_type  text not null check (content_type in ('anime', 'movie')),
+  content_id    text not null,
+  slug          text unique not null,
+  title         text not null,
+  poster_url    text,
+  cards         jsonb not null,
+  published_at  timestamptz not null default now()
+);
+
+create unique index if not exists idx_shorts_content on shorts (content_type, content_id);
+create index if not exists idx_shorts_published on shorts (published_at desc);

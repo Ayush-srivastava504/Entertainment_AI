@@ -30,6 +30,8 @@ export interface MediaItem {
   genres: string[];
   source?: string;
   watchProviders?: WatchProviders | null;
+  /** Set from the admin panel to hide a thin/duplicate page from Google + the sitemap. */
+  noindex?: boolean;
 }
 
 export function normalizeAnime(item: any): MediaItem {
