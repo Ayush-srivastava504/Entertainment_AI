@@ -129,14 +129,17 @@ export default function RootLayout({
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd).replace(/</g, "\\u003c") }}
         />
-        {/* Google tag (gtag.js) — loads after the page is interactive so it
-            never blocks first paint; "afterInteractive" is the strategy
-            Next.js recommends for analytics scripts. */}
+        {/* Google tag (gtag.js) — loaded with "lazyOnload" so its ~68 KiB
+            downloads during browser idle time, after the page has finished
+            loading, instead of racing the app's own JS on the critical
+            path (this is what Lighthouse's "Reduce unused JavaScript" /
+            "Legacy JavaScript" diagnostics were flagging). Analytics
+            firing a beat later is imperceptible to users. */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="ga4-init" strategy="afterInteractive">
+        <Script id="ga4-init" strategy="lazyOnload">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}

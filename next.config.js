@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Inlines the CSS actually needed for above-the-fold content directly
+    // into the HTML and loads the rest of the stylesheet asynchronously,
+    // so the <link rel="stylesheet"> is no longer a render-blocking
+    // request (this is what Lighthouse's "Render-blocking requests"
+    // diagnostic was flagging). Requires the `critters` package below.
+    optimizeCss: true,
+  },
   // Set to 'export' only if you deploy the static build to Cloudflare Pages / Netlify
   // WITHOUT using Next's Node/Edge runtime for /app/api routes (see README:
   // "Deploying without a Node server").
