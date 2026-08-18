@@ -27,9 +27,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: url },
-    // Thin/duplicate catalog pages flipped off in /admin stay reachable
-    // (direct link, comments) but drop out of Google's index and the sitemap.
-    robots: anime.noindex ? { index: false, follow: true } : undefined,
     openGraph: {
       title: anime.title,
       description,
@@ -63,7 +60,7 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
     "@type": "TVSeries",
     name: anime.title,
     image: anime.posterUrl || undefined,
-    description: anime.description || undefined,
+    description: anime.longDescription || anime.description || undefined,
     genre: anime.genres,
     ...(anime.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: anime.score, bestRating: 10 } } : {}),
   };
@@ -96,7 +93,13 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ sl
         <div>
           <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🍥 detail</p>
           <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">{anime.title}</h1>
-          <p className="mt-4 text-marquee-textDim">{anime.description}</p>
+          {anime.longDescription ? (
+            anime.longDescription.split(/\n+/).filter(Boolean).map((para, i) => (
+              <p key={i} className="mt-4 text-marquee-textDim">{para}</p>
+            ))
+          ) : (
+            <p className="mt-4 text-marquee-textDim">{anime.description}</p>
+          )}
           <div className="mt-6 flex flex-wrap gap-2 text-sm text-marquee-textDim">
             {anime.year ? <span className="rounded border border-marquee-line px-3 py-1">{anime.year}</span> : null}
             {anime.score ? <span className="rounded border border-marquee-line px-3 py-1">★ {anime.score.toFixed(1)}</span> : null}

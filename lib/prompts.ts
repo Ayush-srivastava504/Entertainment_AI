@@ -9,7 +9,8 @@ export type Task =
   | "anime-find"
   | "tag-generate"
   | "story-generate"
-  | "thumbnail-feedback";
+  | "thumbnail-feedback"
+  | "elaborate-description";
 
 export function buildPrompt(task: Task, input: Record<string, string>): string {
   switch (task) {
@@ -62,6 +63,22 @@ export function buildPrompt(task: Task, input: Record<string, string>): string {
         "",
         `Metrics: ${input.metrics}`,
       ].join("\n");
+
+    case "elaborate-description":
+      return [
+        `You write original detail-page copy for a ${input.kind} database site.`,
+        `Rewrite the synopsis below into 2 short paragraphs (90-130 words`,
+        "total) in your own words — do not copy phrases from the original.",
+        "Mention the premise, tone/genre, and what makes it distinctive.",
+        "No spoilers past the setup. No preamble, no title restatement,",
+        "no headings, plain prose only.",
+        "",
+        `Title: ${input.title}${input.year ? ` (${input.year})` : ""}`,
+        input.genres ? `Genres: ${input.genres}` : "",
+        `Original synopsis: ${input.query}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
 
     default:
       throw new Error(`Unknown task: ${task satisfies never}`);

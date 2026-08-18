@@ -33,9 +33,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: url },
-    // Thin/duplicate catalog pages flipped off in /admin stay reachable
-    // (direct link, comments) but drop out of Google's index and the sitemap.
-    robots: movie.noindex ? { index: false, follow: true } : undefined,
     openGraph: {
       title: movie.title,
       description,
@@ -73,7 +70,7 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
     name: movie.title,
     datePublished: movie.year ? String(movie.year) : undefined,
     image: movie.posterUrl || undefined,
-    description: movie.description || undefined,
+    description: movie.longDescription || movie.description || undefined,
     genre: movie.genres,
     ...(movie.score ? { aggregateRating: { "@type": "AggregateRating", ratingValue: movie.score, bestRating: 10 } } : {}),
   };
@@ -106,7 +103,13 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
         <div>
           <p className="font-mono text-xs tracking-[0.3em] text-marquee-gold">🎬 detail</p>
           <h1 className="mt-3 font-display text-3xl sm:text-5xl text-marquee-text">{movie.title}</h1>
-          <p className="mt-4 text-marquee-textDim">{movie.description}</p>
+          {movie.longDescription ? (
+            movie.longDescription.split(/\n+/).filter(Boolean).map((para, i) => (
+              <p key={i} className="mt-4 text-marquee-textDim">{para}</p>
+            ))
+          ) : (
+            <p className="mt-4 text-marquee-textDim">{movie.description}</p>
+          )}
           <div className="mt-6 flex flex-wrap gap-2 text-sm text-marquee-textDim">
             {movie.year ? <span className="rounded border border-marquee-line px-3 py-1">{movie.year}</span> : null}
             {movie.score ? <span className="rounded border border-marquee-line px-3 py-1">★ {movie.score.toFixed(1)}</span> : null}

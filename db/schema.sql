@@ -124,6 +124,11 @@ create table if not exists anime (
 alter table anime add column if not exists source text not null default 'jikan';
 alter table anime add column if not exists slug text;
 
+-- See the matching comment on the movies table above.
+alter table anime add column if not exists ai_description text;
+alter table anime add column if not exists ai_description_generated_at timestamptz;
+create index if not exists idx_anime_needs_ai_description on anime (popularity asc nulls last) where ai_description is null;
+
 create index if not exists idx_anime_score on anime (score desc nulls last);
 create index if not exists idx_anime_popularity on anime (popularity asc nulls last);
 create index if not exists idx_anime_year on anime (year desc nulls last);
@@ -162,6 +167,15 @@ create index if not exists idx_movies_watchers on movies (watchers desc nulls la
 
 alter table movies add column if not exists watch_providers jsonb;
 alter table movies add column if not exists watch_providers_synced_at timestamptz;
+
+-- Groq-elaborated description, generated once per title and cached here so
+-- the AI is never called twice for the same row and never called at
+-- request/render time. Backfilled incrementally by
+-- crawler/elaborate-descriptions.mjs, which only ever processes rows where
+-- this is still null.
+alter table movies add column if not exists ai_description text;
+alter table movies add column if not exists ai_description_generated_at timestamptz;
+create index if not exists idx_movies_needs_ai_description on movies (watchers desc nulls last) where ai_description is null;
 create index if not exists idx_movies_plays on movies (plays desc nulls last);
 create index if not exists idx_movies_list_count on movies (list_count desc nulls last);
 create index if not exists idx_movies_year on movies (year desc nulls last);
@@ -196,31 +210,3 @@ create table if not exists sync_state (
 );
 
 alter table sync_state add column if not exists details jsonb;
--- Admin controls: manual quality/visibility overrides for thin-content
--- cleanup (see GSC "Discovered/Crawled - currently not indexed" issue).
-alter table anime add column if not exists noindex boolean not null default false;
-alter table anime add column if not exists featured boolean not null default false;
-alter table anime add column if not exists synopsis_override text;
-
-alter table movies add column if not exists noindex boolean not null default false;
-alter table movies add column if not exists featured boolean not null default false;
-alter table movies add column if not exists synopsis_override text;
-
-create index if not exists idx_anime_featured on anime (featured) where featured = true;
-create index if not exists idx_movies_featured on movies (featured) where featured = true;
-
--- Shorts: vertical swipeable story cards per anime/movie title, generated
--- offline in batches (crawler/shorts-crawler.mjs), not on-request.
-create table if not exists shorts (
-  id            uuid primary key default gen_random_uuid(),
-  content_type  text not null check (content_type in ('anime', 'movie')),
-  content_id    text not null,
-  slug          text unique not null,
-  title         text not null,
-  poster_url    text,
-  cards         jsonb not null,
-  published_at  timestamptz not null default now()
-);
-
-create unique index if not exists idx_shorts_content on shorts (content_type, content_id);
-create index if not exists idx_shorts_published on shorts (published_at desc);

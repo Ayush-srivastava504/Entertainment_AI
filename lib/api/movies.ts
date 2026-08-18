@@ -20,19 +20,17 @@ function rowToMedia(row: any): MediaItem {
     slug: row.slug || buildMediaSlug(row.title, row.year, String(row.id)),
     kind: "movie",
     title: row.title,
-    // An admin-written synopsis_override always wins over the raw TMDB
-    // description/tagline — that's the fix for thin, duplicate catalog pages.
-    description: (row.synopsis_override ?? row.description ?? row.tagline ?? "A notable movie pick from the current catalog.")
+    description: (row.description ?? row.tagline ?? "A notable movie pick from the current catalog.")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, row.synopsis_override ? 2000 : 180),
+      .slice(0, 180),
+    longDescription: row.ai_description ?? undefined,
     posterUrl: row.poster_url ?? undefined,
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
     genres: row.genres ?? [],
     source: "tmdb",
     watchProviders: row.watch_providers ?? null,
-    noindex: row.noindex ?? false,
   };
 }
 
@@ -155,7 +153,7 @@ export async function getAllMovieSlugs(): Promise<{ slug: string; updatedAt: Dat
   return cached("movies:all-slugs", 3600, async () => {
     try {
       const { rows } = await getPool().query(
-        "select id, slug, title, year, updated_at from movies where noindex = false order by id"
+        "select id, slug, title, year, updated_at from movies order by id"
       );
       return rows.map((row: any) => ({
         slug: row.slug || buildMediaSlug(row.title, row.year, String(row.id)),

@@ -24,14 +24,17 @@ export interface MediaItem {
   kind: MediaKind;
   title: string;
   description: string;
+  /** Longer, Groq-elaborated body copy for the detail page (2 short
+   *  paragraphs), distinct from the truncated `description` used for
+   *  cards/meta tags. Undefined until crawler/elaborate-descriptions.mjs
+   *  has processed this row — callers should fall back to `description`. */
+  longDescription?: string;
   posterUrl?: string;
   year?: number;
   score?: number;
   genres: string[];
   source?: string;
   watchProviders?: WatchProviders | null;
-  /** Set from the admin panel to hide a thin/duplicate page from Google + the sitemap. */
-  noindex?: boolean;
 }
 
 export function normalizeAnime(item: any): MediaItem {

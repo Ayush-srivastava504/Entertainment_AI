@@ -6,6 +6,8 @@ on:
     - cron: "0 */6 * * *"
     # Deep full sync once a week (Sunday 03:00 UTC)
     - cron: "0 3 * * 0"
+    # Description elaboration, once a day (see elaborate-descriptions job)
+    - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
       full:
@@ -15,6 +17,10 @@ on:
 
 jobs:
   sync:
+    # This workflow now has three schedules; without this guard the new
+    # 8am description-elaboration cron below would also trigger a full
+    # TMDB/Jikan catalog crawl, which isn't what that schedule is for.
+    if: ${{ github.event.schedule != '0 8 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -75,3 +81,37 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run crawl:mood-lists
+
+  elaborate-descriptions:
+    # Separate job, separate schedule from `sync` above — this only ever
+    # touches rows that already exist, so it doesn't need to run every 6
+    # hours, and keeping it apart means a Groq slowdown/outage can never
+    # block the TMDB/Jikan catalog sync (or vice versa). 150+150=300
+    # requests/day, well under the free tier's daily cap on every model —
+    # confirm your account's actual limit at
+    # https://console.groq.com/docs/rate-limits and raise --limit in
+    # package.json only once you have (paid tier or a comfortable margin).
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.schedule == '0 8 * * *' || inputs.full == true }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Elaborate movie descriptions
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: npm run elaborate:movies
+
+      - name: Elaborate anime descriptions
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: npm run elaborate:anime
