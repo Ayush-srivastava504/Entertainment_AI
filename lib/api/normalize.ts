@@ -40,6 +40,19 @@ export interface MediaItem {
   genres: string[];
   source?: string;
   watchProviders?: WatchProviders | null;
+  /** SEO/topical tags, Groq-generated alongside longDescription. Rendered as
+   *  chips on the detail page and used to fight thin content + give Google
+   *  more on-page topical signal. */
+  tags?: string[];
+  /** Cast/voice-cast, sourced from TMDB credits (movies) or Jikan characters
+   *  (anime) — never AI-invented, since getting a real person's name wrong
+   *  is worse than not showing a cast section at all. */
+  castList?: { name: string; role: string; photoUrl?: string | null }[];
+  /** True when an editor has pulled this page out of the sitemap + search
+   *  index via /admin (thin/duplicate content). The page still renders
+   *  normally for visitors and in the admin preview, just with a noindex
+   *  robots meta tag. */
+  noindex?: boolean;
 }
 
 export function normalizeAnime(item: any): MediaItem {

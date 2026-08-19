@@ -24,7 +24,9 @@ function rowToMedia(row: any): MediaItem {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 180),
-    longDescription: row.ai_description ?? undefined,
+    // An editor-written synopsis_override always wins over the Groq
+    // elaboration, which in turn beats the raw source description.
+    longDescription: row.synopsis_override ?? row.ai_description ?? undefined,
     posterUrl: row.poster_url ?? undefined,
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
@@ -32,6 +34,9 @@ function rowToMedia(row: any): MediaItem {
     genres: row.genres ?? [],
     source: "tmdb",
     watchProviders: row.watch_providers ?? null,
+    tags: row.tags ?? [],
+    castList: row.cast_list ?? undefined,
+    noindex: row.noindex ?? false,
   };
 }
 
@@ -153,8 +158,10 @@ export async function getMovieRankings(page = 1, limit = 100): Promise<MediaItem
 export async function getAllMovieSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {
   return cached("movies:all-slugs", 3600, async () => {
     try {
+      // Sitemaps should only ever list indexable URLs — a noindex row here
+      // just teaches Google to distrust the sitemap.
       const { rows } = await getPool().query(
-        "select id, slug, title, year, updated_at from movies order by id"
+        "select id, slug, title, year, updated_at from movies where noindex = false order by id"
       );
       return rows.map((row: any) => ({
         slug: row.slug || buildMediaSlug(row.title, row.year, String(row.id)),

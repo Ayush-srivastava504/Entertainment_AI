@@ -34,6 +34,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: url },
+    // An editor can pull a thin/duplicate page out of the index from
+    // /admin without unpublishing it — the page still renders, it just
+    // tells crawlers not to index this URL.
+    robots: movie.noindex ? { index: false, follow: true } : undefined,
     openGraph: {
       title: movie.title,
       description,
@@ -74,6 +78,9 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
     image: movie.posterUrl || undefined,
     description: movie.longDescription || movie.description || undefined,
     genre: movie.genres,
+    ...(movie.castList && movie.castList.length > 0
+      ? { actor: movie.castList.map((m) => ({ "@type": "Person", name: m.name })) }
+      : {}),
     ...(movie.score && movie.ratingCount
       ? {
           aggregateRating: {
@@ -155,11 +162,49 @@ export default async function MovieDetailPage({ params }: { params: Promise<{ sl
             </div>
           )}
 
+          {movie.tags && movie.tags.length > 0 && (
+            <div className="mt-8">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-marquee-gold mb-3">Tags</p>
+              <div className="flex flex-wrap gap-2">
+                {movie.tags.map((tag) => (
+                  <Link
+                    key={tag}
+                    href={`/movies/search?q=${encodeURIComponent(tag)}`}
+                    className="rounded-full border border-marquee-line px-3 py-1 text-xs text-marquee-textDim hover:border-marquee-gold hover:text-marquee-gold"
+                  >
+                    #{tag}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-8">
             <Link href="/movies" className="rounded border border-marquee-line px-4 py-2 text-marquee-text">Back to movies hub</Link>
           </div>
         </div>
       </div>
+
+      {movie.castList && movie.castList.length > 0 && (
+        <div className="mt-14">
+          <p className="font-mono text-xs uppercase tracking-[0.25em] text-marquee-gold mb-4">Cast</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            {movie.castList.map((member) => (
+              <div key={`${member.name}-${member.role}`} className="flex items-center gap-3 rounded border border-marquee-line bg-marquee-panel p-3">
+                {member.photoUrl ? (
+                  <img src={member.photoUrl} alt={member.name} className="h-12 w-12 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <div className="h-12 w-12 shrink-0 rounded-full bg-marquee-line" />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-marquee-text">{member.name}</p>
+                  <p className="truncate text-xs text-marquee-textDim">{member.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <SimilarTitles items={similar} basePath="/movies" />
     </div>

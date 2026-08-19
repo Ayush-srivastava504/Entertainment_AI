@@ -25,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/anime/upcoming",
     "/anime/airing",
     "/anime/search",
+    "/stories",
     "/rankings",
     "/rankings/anime",
     "/rankings/movies",

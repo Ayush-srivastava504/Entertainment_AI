@@ -19,6 +19,8 @@
     "crawl:mood-lists": "node crawler/mood-lists-crawler.mjs",
     "elaborate:movies": "node crawler/elaborate-descriptions.mjs --table=movies --limit=150",
     "elaborate:anime": "node crawler/elaborate-descriptions.mjs --table=anime --limit=150",
+    "crawl:anime-cast": "node crawler/anime-cast-crawler.mjs",
+    "crawl:shorts": "node crawler/shorts-crawler.mjs",
     "crawl:all": "npm run crawl:anime && npm run crawl:movies && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists",
     "crawl:all:full": "npm run crawl:anime:full && npm run crawl:movies:full && npm run crawl:blog && npm run crawl:trivia && npm run crawl:watch-providers && npm run crawl:mood-lists"
   },

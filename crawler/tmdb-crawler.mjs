@@ -69,6 +69,21 @@ function backgroundUrl(path) {
   return path ? `${IMG_BASE}/original${path}` : null;
 }
 
+// Top-billed cast only (first 8) — enough to make the detail page's Cast
+// section useful without dumping the entire, often 50+ person, credits list.
+function castList(detail) {
+  const cast = detail?.credits?.cast;
+  if (!Array.isArray(cast) || cast.length === 0) return null;
+  return cast
+    .slice(0, 8)
+    .map((c) => ({
+      name: c.name,
+      role: c.character || "Cast",
+      photoUrl: c.profile_path ? `${IMG_BASE}/w185${c.profile_path}` : null,
+    }))
+    .filter((c) => c.name);
+}
+
 function toRow(movie, statKey, genreMap, detail) {
   const genres = Array.isArray(movie.genre_ids)
     ? movie.genre_ids.map((id) => genreMap.get(id)).filter(Boolean)
@@ -102,6 +117,7 @@ function toRow(movie, statKey, genreMap, detail) {
     genres,
     language: movie.original_language ?? null,
     released_at: movie.release_date || null,
+    cast_list: castList(detail),
     raw: movie,
   };
 
@@ -122,8 +138,8 @@ async function upsertBatch(rows) {
       await client.query(
         `insert into movies (id, imdb_code, tmdb_id, slug, title, tagline, description, poster_url, background_url,
                               trailer_url, year, score, vote_count, runtime, genres, language, watchers, plays, list_count,
-                              released_at, raw, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now())
+                              released_at, cast_list, cast_synced_at, raw, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,case when $21 is not null then now() else null end,$22,now())
          on conflict (id) do update set
            imdb_code = coalesce(excluded.imdb_code, movies.imdb_code), tmdb_id = excluded.tmdb_id, slug = excluded.slug,
            title = excluded.title, tagline = coalesce(excluded.tagline, movies.tagline), description = excluded.description,
@@ -134,11 +150,14 @@ async function upsertBatch(rows) {
            watchers = coalesce(excluded.watchers, movies.watchers),
            plays = coalesce(excluded.plays, movies.plays),
            list_count = coalesce(excluded.list_count, movies.list_count),
-           released_at = excluded.released_at, raw = excluded.raw, updated_at = now()`,
+           released_at = excluded.released_at,
+           cast_list = coalesce(excluded.cast_list, movies.cast_list),
+           cast_synced_at = coalesce(excluded.cast_synced_at, movies.cast_synced_at),
+           raw = excluded.raw, updated_at = now()`,
         [
           r.id, r.imdb_code, r.tmdb_id, r.slug, r.title, r.tagline, r.description, r.poster_url, r.background_url,
           r.trailer_url, r.year, r.score, r.vote_count, r.runtime, r.genres, r.language, r.watchers, r.plays, r.list_count,
-          r.released_at, JSON.stringify(r.raw),
+          r.released_at, r.cast_list ? JSON.stringify(r.cast_list) : null, JSON.stringify(r.raw),
         ]
       );
     }
@@ -187,7 +206,7 @@ async function main() {
           if (detailCache.has(movie.id)) {
             detail = detailCache.get(movie.id);
           } else {
-            detail = await tmdbFetch(`/movie/${movie.id}?append_to_response=external_ids,videos`);
+            detail = await tmdbFetch(`/movie/${movie.id}?append_to_response=external_ids,videos,credits`);
             detailCache.set(movie.id, detail);
             await sleep(REQUEST_DELAY_MS);
           }

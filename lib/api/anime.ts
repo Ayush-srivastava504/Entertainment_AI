@@ -22,13 +22,16 @@ function rowToMedia(row: any): MediaItem {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 180),
-    longDescription: row.ai_description ?? undefined,
+    longDescription: row.synopsis_override ?? row.ai_description ?? undefined,
     posterUrl: row.poster_url ?? undefined,
     year: row.year ?? undefined,
     score: row.score !== null && row.score !== undefined ? Number(row.score) : undefined,
     ratingCount: row.scored_by !== null && row.scored_by !== undefined ? Number(row.scored_by) : undefined,
     genres: row.genres ?? [],
     source: row.source ?? "jikan",
+    tags: row.tags ?? [],
+    castList: row.cast_list ?? undefined,
+    noindex: row.noindex ?? false,
   };
 }
 
@@ -152,7 +155,7 @@ export async function getAllAnimeSlugs(): Promise<{ slug: string; updatedAt: Dat
   return cached("anime:all-slugs", 3600, async () => {
     try {
       const { rows } = await getPool().query(
-        "select id, slug, title, title_english, year, updated_at from anime order by id"
+        "select id, slug, title, title_english, year, updated_at from anime where noindex = false order by id"
       );
       return rows.map((row: any) => ({
         slug: row.slug || buildMediaSlug(row.title_english || row.title, row.year, String(row.id)),

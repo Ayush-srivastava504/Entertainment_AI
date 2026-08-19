@@ -136,6 +136,28 @@ create index if not exists idx_anime_needs_ai_description on anime (popularity a
 -- ratingCount/reviewCount as an invalid item).
 alter table anime add column if not exists scored_by integer;
 
+-- Admin-panel SEO controls (see lib/admin-db.ts / app/admin/anime). These
+-- were referenced by the admin panel, the shorts crawler, and the public
+-- rowToMedia() normalizer long before they existed here, which meant every
+-- one of those queries was failing against a real database. noindex lets an
+-- editor pull a thin/duplicate page out of the sitemap + search index;
+-- featured highlights a title; synopsis_override lets an editor replace a
+-- thin/auto-imported synopsis with real hand-written copy.
+alter table anime add column if not exists noindex boolean not null default false;
+alter table anime add column if not exists featured boolean not null default false;
+alter table anime add column if not exists synopsis_override text;
+
+-- SEO/topical-relevance tags (Groq-generated, see crawler/elaborate-descriptions.mjs)
+-- and cast/voice-cast data (see crawler/anime-cast-crawler.mjs), both rendered
+-- on the detail page so it's no longer just a poster + one paragraph.
+alter table anime add column if not exists tags text[] not null default '{}';
+alter table anime add column if not exists cast_list jsonb;
+alter table anime add column if not exists cast_synced_at timestamptz;
+
+create index if not exists idx_anime_noindex on anime (noindex) where noindex = true;
+create index if not exists idx_anime_tags on anime using gin (tags);
+create index if not exists idx_anime_needs_cast on anime (popularity asc nulls last) where cast_list is null;
+
 create index if not exists idx_anime_score on anime (score desc nulls last);
 create index if not exists idx_anime_popularity on anime (popularity asc nulls last);
 create index if not exists idx_anime_year on anime (year desc nulls last);
@@ -188,6 +210,20 @@ alter table movies add column if not exists watch_providers_synced_at timestampt
 alter table movies add column if not exists ai_description text;
 alter table movies add column if not exists ai_description_generated_at timestamptz;
 create index if not exists idx_movies_needs_ai_description on movies (watchers desc nulls last) where ai_description is null;
+
+-- Same admin-panel SEO controls as the anime table above (noindex/featured/
+-- synopsis_override) plus tags + cast, kept in sync with the anime table so
+-- lib/admin-db.ts and lib/api/{movies,anime}.ts can use one shared code path.
+alter table movies add column if not exists noindex boolean not null default false;
+alter table movies add column if not exists featured boolean not null default false;
+alter table movies add column if not exists synopsis_override text;
+alter table movies add column if not exists tags text[] not null default '{}';
+alter table movies add column if not exists cast_list jsonb;
+alter table movies add column if not exists cast_synced_at timestamptz;
+
+create index if not exists idx_movies_noindex on movies (noindex) where noindex = true;
+create index if not exists idx_movies_tags on movies using gin (tags);
+create index if not exists idx_movies_needs_cast on movies (watchers desc nulls last) where cast_list is null;
 create index if not exists idx_movies_plays on movies (plays desc nulls last);
 create index if not exists idx_movies_list_count on movies (list_count desc nulls last);
 create index if not exists idx_movies_year on movies (year desc nulls last);
@@ -211,6 +247,27 @@ update anime set slug =
   || case when year is not null then '-' || year::text else '' end
   || '-' || id
 where slug is null;
+
+-- Vertical swipeable "shorts" story cards for /stories, one row per
+-- anime/movie title. Written offline by crawler/shorts-crawler.mjs and,
+-- going forward, by editors directly via /admin/shorts. This table was
+-- queried and inserted into from several places (lib/api/shorts.ts,
+-- app/api/shorts/route.ts, crawler/shorts-crawler.mjs, lib/admin-db.ts
+-- stats) but never actually created — every one of those queries was
+-- silently failing, which is why nothing ever showed up on the site.
+create table if not exists shorts (
+  id            uuid primary key default gen_random_uuid(),
+  content_type  text not null check (content_type in ('anime', 'movie')),
+  content_id    text not null,
+  slug          text unique not null,
+  title         text not null,
+  poster_url    text,
+  cards         jsonb not null default '[]',
+  published_at  timestamptz not null default now()
+);
+
+create unique index if not exists idx_shorts_content on shorts (content_type, content_id);
+create index if not exists idx_shorts_published on shorts (published_at desc);
 
 create table if not exists sync_state (
   source              text primary key,

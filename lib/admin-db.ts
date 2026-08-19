@@ -229,3 +229,136 @@ export async function listAdminComments(page = 1, limit = 30): Promise<{ rows: A
 export async function deleteAdminComment(id: string): Promise<void> {
   await getPool().query(`delete from comments where id = $1`, [id]);
 }
+
+/*
+Admin CRUD for "shorts" — the vertical swipeable story cards on /stories.
+crawler/shorts-crawler.mjs generates these in bulk from catalog data; this
+lets an editor write/edit one by hand from /admin/shorts (per the request
+to be able to create shorts manually instead of only via the crawler).
+*/
+
+export interface AdminShortCard {
+  heading: string;
+  text: string;
+}
+
+export interface AdminShortRow {
+  id: string;
+  slug: string;
+  title: string;
+  contentType: "anime" | "movie";
+  contentId: string;
+  posterUrl: string | null;
+  cards: AdminShortCard[];
+  publishedAt: string;
+}
+
+function rowToAdminShort(row: any): AdminShortRow {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    contentType: row.content_type,
+    contentId: row.content_id,
+    posterUrl: row.poster_url,
+    cards: row.cards ?? [],
+    publishedAt: row.published_at,
+  };
+}
+
+export async function listAdminShorts(
+  opts: { query?: string; page?: number; limit?: number } = {}
+): Promise<{ rows: AdminShortRow[]; total: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(100, Math.max(1, opts.limit ?? 25));
+  const offset = (page - 1) * limit;
+
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (opts.query?.trim()) {
+    params.push(`%${opts.query.trim()}%`);
+    clauses.push(`title ilike $${params.length}`);
+  }
+  const where = clauses.length ? `where ${clauses.join(" and ")}` : "";
+
+  const countRes = await getPool().query(`select count(*)::int as total from shorts ${where}`, params);
+
+  params.push(limit, offset);
+  const { rows } = await getPool().query(
+    `select * from shorts ${where} order by published_at desc limit $${params.length - 1} offset $${params.length}`,
+    params
+  );
+
+  return { total: countRes.rows[0].total, rows: rows.map(rowToAdminShort) };
+}
+
+export async function getAdminShort(id: string): Promise<AdminShortRow | null> {
+  const { rows } = await getPool().query(`select * from shorts where id = $1`, [id]);
+  return rows[0] ? rowToAdminShort(rows[0]) : null;
+}
+
+function slugifyForShort(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 160);
+}
+
+export interface AdminShortInput {
+  title: string;
+  contentType: "anime" | "movie";
+  contentId: string;
+  posterUrl: string | null;
+  cards: AdminShortCard[];
+}
+
+export async function createAdminShort(input: AdminShortInput): Promise<AdminShortRow> {
+  const slug = `${slugifyForShort(input.title)}-${input.contentType}-${input.contentId}`.slice(0, 200);
+  const { rows } = await getPool().query(
+    `insert into shorts (content_type, content_id, slug, title, poster_url, cards)
+     values ($1, $2, $3, $4, $5, $6::jsonb)
+     on conflict (content_type, content_id) do update set
+       title = excluded.title, poster_url = excluded.poster_url, cards = excluded.cards, slug = excluded.slug
+     returning *`,
+    [input.contentType, input.contentId, slug, input.title, input.posterUrl, JSON.stringify(input.cards)]
+  );
+  await invalidate("shorts:");
+  return rowToAdminShort(rows[0]);
+}
+
+export async function updateAdminShort(
+  id: string,
+  patch: Partial<AdminShortInput>
+): Promise<AdminShortRow | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  if (patch.title !== undefined) {
+    params.push(patch.title);
+    sets.push(`title = $${params.length}`);
+  }
+  if (patch.posterUrl !== undefined) {
+    params.push(patch.posterUrl || null);
+    sets.push(`poster_url = $${params.length}`);
+  }
+  if (patch.cards !== undefined) {
+    params.push(JSON.stringify(patch.cards));
+    sets.push(`cards = $${params.length}::jsonb`);
+  }
+  if (!sets.length) return getAdminShort(id);
+
+  params.push(id);
+  const { rows } = await getPool().query(
+    `update shorts set ${sets.join(", ")} where id = $${params.length} returning *`,
+    params
+  );
+  await invalidate("shorts:");
+  return rows[0] ? rowToAdminShort(rows[0]) : null;
+}
+
+export async function deleteAdminShort(id: string): Promise<void> {
+  await getPool().query(`delete from shorts where id = $1`, [id]);
+  await invalidate("shorts:");
+}

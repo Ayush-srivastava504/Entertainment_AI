@@ -148,6 +148,10 @@ export async function upsertAnimeBatch(rows) {
            genres = excluded.genres, studios = excluded.studios, aired_from = excluded.aired_from,
            aired_to = excluded.aired_to, raw = excluded.raw, source = excluded.source, slug = excluded.slug,
            updated_at = now()`,
+        // Note: this batch upsert intentionally never touches noindex,
+        // featured, synopsis_override, tags, or cast_list — those are
+        // editor/AI-owned columns (admin panel, elaborate-descriptions.mjs,
+        // anime-cast-crawler.mjs) and must survive a plain re-sync untouched.
         [
           r.id, r.title, r.title_english, r.synopsis, r.poster_url, r.trailer_url, r.year, r.score, r.scored_by,
           r.popularity, r.rank, r.episodes, r.status, r.type, r.genres, r.studios, r.aired_from, r.aired_to,

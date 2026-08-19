@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
       label: "Shorts",
       value: stats.shortsTotal,
       sub: "swipeable story cards generated",
-      href: "/stories",
+      href: "/admin/shorts",
     },
   ];
 

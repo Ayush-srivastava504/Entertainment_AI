@@ -52,16 +52,21 @@ function buildPrompt({
   return [
     `You write original detail-page copy for a ${kind} database site.`,
     "",
-    "Rewrite the synopsis below into 2 short paragraphs.",
+    "Return ONLY a JSON object with exactly two keys: \"description\" and \"tags\".",
+    "Do not add a preamble, code fences, or any text outside the JSON object.",
+    "",
+    "\"description\": rewrite the synopsis below into 2 short paragraphs.",
     "Write approximately 90-130 words total.",
-    "Use completely original wording.",
-    "Do not copy phrases from the source.",
+    "Use completely original wording. Do not copy phrases from the source.",
     "Explain the premise, tone, genre, and what makes the title distinctive.",
     "Do not include spoilers beyond the basic setup.",
-    "Do not use headings.",
-    "Do not restate the title.",
-    "Do not add a preamble.",
-    "Return only the finished prose.",
+    "Do not use headings. Do not restate the title. Use \\n\\n between the two paragraphs.",
+    "",
+    "\"tags\": an array of 6-10 short, lowercase, hyphenated topical keywords",
+    "someone searching for this title's mood, subgenre, themes, or setting",
+    "would plausibly search for (e.g. \"slow-burn-mystery\", \"found-family\",",
+    "\"post-apocalyptic\", \"single-location\"). Do not just restate the genres",
+    "list verbatim. Do not include the title itself as a tag.",
     "",
     `Title: ${title}${year ? ` (${year})` : ""}`,
     genres?.length
@@ -72,6 +77,25 @@ function buildPrompt({
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function parseElaboration(text) {
+  // Groq is asked for raw JSON but models sometimes wrap it in ```json
+  // fences anyway — strip those defensively before parsing.
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  const parsed = JSON.parse(cleaned);
+
+  const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
+  if (!description) throw new Error("parsed JSON missing non-empty 'description'");
+
+  const tags = Array.isArray(parsed.tags)
+    ? parsed.tags
+        .filter((t) => typeof t === "string" && t.trim())
+        .map((t) => t.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 40))
+        .slice(0, 10)
+    : [];
+
+  return { description, tags };
 }
 
 async function elaborate(row, kind) {
@@ -176,7 +200,7 @@ async function elaborate(row, kind) {
     );
   }
 
-  return text;
+  return parseElaboration(text);
 }
 
 async function main() {
@@ -236,7 +260,7 @@ async function main() {
 
     for (const row of rows) {
       try {
-        const aiDescription = await elaborate(
+        const { description: aiDescription, tags } = await elaborate(
           row,
           kind
         );
@@ -246,12 +270,14 @@ async function main() {
             UPDATE ${TABLE}
             SET
               ai_description = $1,
-              ai_description_generated_at = NOW()
+              ai_description_generated_at = NOW(),
+              tags = case when $3::text[] != '{}' then $3::text[] else tags end
             WHERE id = $2
           `,
           [
             aiDescription,
             row.id,
+            tags,
           ]
         );
 
